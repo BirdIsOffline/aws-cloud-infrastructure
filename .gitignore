@@ -1,0 +1,66 @@
+# Terraform local files
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfvars
+*.tfvars.json
+*.tfplan
+*.tfplan.*
+*.plan
+plan.out
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Credentials and secrets
+.env
+.env.*
+.aws/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Recovery files, runtime output, and local audit/deployment artifacts
+*.backup
+*.backup.*
+*.bak
+*.bak.*
+*.orig
+*~
+*.log
+*.zip
+*.tar
+*.tar.gz
+backups/
+inventory/
+artifacts/
+tmp/
+temp/
+.tmp/
+.local/
+.ci-tools/
+
+# Local development instructions and Python caches
+.codex/
+.agents/
+AGENTS.md
+SKILL.md
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local configuration
+.terraformrc
+terraform.rc
+.vscode/
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db

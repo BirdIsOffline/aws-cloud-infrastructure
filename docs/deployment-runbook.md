@@ -1,5 +1,10 @@
 # Server deployment runbook
 
+The [isolated recovery harness](recovery-testing.md) exercises failure and rollback
+paths with disposable Linux files and command substitutes. It never connects to
+the server. Passing those simulations does not establish live recovery; the live
+tests below still require separate approval.
+
 Controlled deployment and strict configuration idempotency testing are complete.
 The corrected scripts preserved content, metadata, packages, services, and backup
 inventory during the verified repeat run. Formal failure and rollback/recovery

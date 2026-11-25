@@ -1,5 +1,16 @@
 # Continuous integration and manual delivery
 
+## Isolated recovery validation
+
+The source job also runs the offline Linux recovery harness through the existing
+validation entry point. Its 31 cases use unchanged production code inside an
+ephemeral chroot with isolated network/PID/mount namespaces and no credentials or
+host mounts. Missing Linux isolation support fails CI. Eleven additional portable
+guard tests run with the existing regression suite. See
+[the recovery test guide](recovery-testing.md) for prerequisites, safety boundaries,
+expected exit codes, and the distinction between simulated and live recovery.
+The new Linux cases await their first approved hosted execution.
+
 ## Current scope
 
 `.github/workflows/ci.yml` validates public source only. It runs on pushes to

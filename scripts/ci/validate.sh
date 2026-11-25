@@ -10,6 +10,7 @@ done
 python3 scripts/ci/validate.py
 python3 -B scripts/ssm/bundle.py
 python3 -B -m unittest discover -s tests -p 'test_*.py'
+python3 -B tests/recovery_runner.py
 for script in scripts/*.sh scripts/ci/*.sh; do
   bash -n "$script"
   shellcheck "$script"

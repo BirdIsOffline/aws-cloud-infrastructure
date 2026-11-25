@@ -59,7 +59,10 @@ elif name == "curl":
     if flag("website_http_failure") and not flag("website_failed"):
         state["website_failed"] = True
         code = 22
-    elif flag("verification_http_failure") and state["http_calls"] == 2:
+    elif flag("verification_http_failure") and "--write-out" in args and not flag("verification_failure_injected"):
+        # Only verify-server requests a status code. Never shift this fault into rollback.
+        state["verification_failure_injected"] = True
+        state.setdefault("injected_faults", []).append("verification_http")
         code = 22
     else:
         if "--output" in args:

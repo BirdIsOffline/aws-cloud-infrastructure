@@ -1,9 +1,12 @@
 # Isolated failure and recovery tests
 
-The recovery harness is implemented for offline Linux execution. The Windows
-development machine has no installed WSL distribution; the 31 isolated Linux
-cases have not yet executed. Hosted Ubuntu execution is pending approval to
-publish. These tests are simulations, not completed live recovery tests.
+The recovery harness runs offline Linux simulations, not live server tests. The
+first hosted run executed all 31 recovery cases and identified a disposable-root
+initialization omission: `/tmp` was missing. Bare `mktemp`, used by unchanged
+server verification, requires `/tmp` when `TMPDIR` is unset. The corrected fixture
+creates and resets root-owned `/tmp` and `/var/tmp` with mode 1777. Two additional
+Linux readiness guards reproduce the missing-directory failure and verify bare
+`mktemp` succeeds with safe metadata. Windows still has no installed Linux runtime.
 
 ## Isolation and execution
 
@@ -69,7 +72,19 @@ Existing orchestration tests verify single submission, ambiguous responses,
 polling deadlines, and no redeployment after verification failure. Eleven portable
 guard tests cover environment stripping, workspace/path identity, nonce checks,
 namespace enforcement, argument rejection, source allowlist, platform handling,
-and absence of skipped Linux cases.
+and absence of skipped Linux cases. Two further portable tests verify diagnostic
+redaction and bounded output, for 13 portable guards in total.
+
+Temporary-directory metadata and a real bare `mktemp` are checked before every
+recovery case, after fixture reset. No host temporary directory is mounted.
+The verification HTTP fault targets the status-requesting invocation, rather than
+an HTTP call count, and is injected only once. Recovery assertions verify that
+it occurred; the fault cannot shift into a website rollback request.
+
+Unexpected errors emit only allowlisted script exit codes, record/recovery states,
+and fixed diagnostic categories from at most 32 KiB of private subprocess output.
+Raw subprocess text, paths, payloads and identifiers are not forwarded. Diagnostics
+are collected before fixture cleanup; they do not change failure status or retry.
 
 Website backups may preserve 0644 files inside root-owned 0700 directories;
 coordinator copies and private diagnostics use 0600. Assertions check content,
@@ -92,8 +107,9 @@ identity stops cleanup. It never accepts an arbitrary deletion directory.
 
 Local checks can establish syntax, source hygiene, release integrity, portable
 guard behavior, regression results, and static tooling results. They cannot
-establish Linux recovery success on Windows. The next hosted run must execute
-all 79 ordinary tests and all 31 isolated cases: 110 total, zero skips.
+establish Linux recovery success on Windows. The corrected hosted run must execute
+all 81 ordinary tests, 31 recovery cases and two Linux readiness guards:
+114 total, zero skips. This retains all 110 original tests and adds four guards.
 
 Even a successful Linux run demonstrates simulated recovery with command
 substitutes. Actual Amazon Linux Nginx/Agent activation, live rollback, notification

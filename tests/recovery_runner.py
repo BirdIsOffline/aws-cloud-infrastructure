@@ -111,9 +111,11 @@ def build(root):
             raise RuntimeError("Fixture source integrity mismatch")
     for name in ("recovery_suite.py", "recovery_stub.py"):
         copy_file(root, ROOT / "tests" / name, "/suite/" + name)
-    for directory in ("etc", "dev", "var/tmp", "var/lib", "var/backups", "fixture", "opt", "usr/sbin", "bin", "sbin"):
+    for directory in ("etc", "dev", "tmp", "var/tmp", "var/lib", "var/backups", "fixture", "opt", "usr/sbin", "bin", "sbin"):
         (root / directory).mkdir(parents=True, exist_ok=True)
-    (root / "var/tmp").chmod(0o1777)
+    for directory in ("tmp", "var/tmp"):
+        os.chown(root / directory, 0, 0)
+        (root / directory).chmod(0o1777)
     (root / "dev/null").touch(mode=0o666)
     (root / "etc/passwd").write_text("root:x:0:0:fixture:/root:/usr/bin/bash\n")
     (root / "etc/group").write_text("root:x:0:\n")

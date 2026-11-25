@@ -31,6 +31,136 @@ def isolation_guard():
         raise RuntimeError("Isolated root context missing")
 
 
+def diagnostic_summary(text, record=None):
+    """Allowlisted categories only: never forward raw output, inputs, paths or IDs."""
+    record = record if isinstance(record, dict) else {}
+    text = str(text)[-32768:].lower()
+    categories = {
+        "missing_temporary_directory": ("mktemp:", "no such file or directory"),
+        "temporary_file_failure": ("mktemp:",),
+        "permission_denied": ("permission denied",),
+        "candidate_validation_failure": ("validation failed",),
+        "activation_failure": ("activation failed",),
+        "rollback_failure": ("rollback failed",),
+        "http_failure": ("http", "failed"),
+        "python_exception": ("traceback (most recent call last)",),
+    }
+    scripts = ("bootstrap.sh", "deploy-website.sh", "configure-monitoring.sh", "verify-server.sh")
+    codes = record.get("scripts", {})
+    codes = codes if isinstance(codes, dict) else {}
+    statuses = {"preflight", "deploying", "verified", "failed"}
+    recovery = {"not required", "baseline health and configuration verified",
+                "operator recovery required; never retry blindly",
+                "operator must verify stopped subprocesses before recovery"}
+    return {
+        "status": record.get("status") if record.get("status") in statuses else "unavailable",
+        "failed_script": record.get("failed_script") if record.get("failed_script") in scripts else None,
+        "script_exit_codes": {name: codes[name] for name in scripts if name in codes and type(codes[name]) is int and -255 <= codes[name] <= 255},
+        "recovery": record.get("recovery") if record.get("recovery") in recovery else "unavailable",
+        "categories": [name for name, needles in categories.items() if all(value in text for value in needles)],
+    }
+
+
+def temporary_directory_metadata():
+    for name in ("/tmp", "/var/tmp"):
+        value = Path(name).lstat()
+        if not stat.S_ISDIR(value.st_mode) or (value.st_uid, value.st_gid, stat.S_IMODE(value.st_mode)) != (0, 0, 0o1777):
+            raise RuntimeError("Fixture temporary directory metadata is unsafe")
+
+
+def reset_temporary_directories():
+    isolation_guard()
+    for name in ("/tmp", "/var/tmp"):
+        target = Path(name)
+        if target.is_symlink() or target.exists() and not target.is_dir():
+            raise RuntimeError("Unsafe fixture temporary directory")
+        if target.exists():
+            shutil.rmtree(target)
+        target.mkdir(mode=0o1777)
+        os.chown(target, 0, 0)
+        target.chmod(0o1777)
+    temporary_directory_metadata()
+
+
+def bare_mktemp():
+    isolation_guard()
+    # No TMPDIR override: exercise the unchanged verification script's default.
+    return subprocess.run(["/usr/bin/mktemp"], env={"PATH": "/usr/bin:/bin", "LC_ALL": "C", "LANG": "C", "HOME": "/nonexistent"},
+                          capture_output=True, text=True, timeout=5)
+
+
+def temporary_directory_readiness():
+    isolation_guard()
+    temporary_directory_metadata()
+    result = bare_mktemp()
+    if result.returncode:
+        raise RuntimeError("Bare mktemp readiness failed: " + json.dumps(diagnostic_summary(result.stderr)))
+    target = Path(result.stdout.strip())
+    if target.parent != Path("/tmp") or not target.name.startswith("tmp."):
+        raise RuntimeError("Bare mktemp returned an unexpected fixture path")
+    value = target.lstat()
+    if not stat.S_ISREG(value.st_mode) or (value.st_uid, value.st_gid, stat.S_IMODE(value.st_mode), value.st_nlink) != (0, 0, 0o600, 1):
+        raise RuntimeError("Bare mktemp produced unsafe file metadata")
+    target.unlink()
+
+
+def emit_fixture_diagnostics():
+    try:
+        isolation_guard()
+        record = {}
+        path = Path("/var/lib/aws-portfolio-deploy/fixture-operation.json")
+        if path.is_file() and not path.is_symlink() and path.stat().st_size < 32768:
+            record = json.loads(path.read_text())
+        text = ""
+        stage = Path(record.get("stage", "/unavailable"))
+        if stage.parent == Path("/var/tmp") and stage.name.startswith("aws-portfolio-cd.") and stage.resolve() == stage:
+            value = stage.lstat()
+            if stat.S_ISDIR(value.st_mode) and value.st_uid == value.st_gid == 0 and stat.S_IMODE(value.st_mode) == 0o700:
+                log = stage / "execution.log"
+                value = log.lstat()
+                if stat.S_ISREG(value.st_mode) and value.st_nlink == 1 and value.st_uid == value.st_gid == 0:
+                    with log.open("rb") as stream:
+                        stream.seek(max(0, value.st_size - 32768))
+                        text = stream.read(32768).decode("utf-8", errors="replace")
+        print("FIXTURE_DIAGNOSTIC " + json.dumps(diagnostic_summary(text, record), sort_keys=True), file=sys.stderr)
+    except (OSError, ValueError, TypeError, RuntimeError):
+        print('FIXTURE_DIAGNOSTIC {"collection":"unavailable"}', file=sys.stderr)
+
+
+class FixtureResult(unittest.TextTestResult):
+    def addFailure(self, test, err):
+        super().addFailure(test, err)
+        emit_fixture_diagnostics()
+
+    def addError(self, test, err):
+        super().addError(test, err)
+        emit_fixture_diagnostics()
+
+
+class FixtureRunner(unittest.TextTestRunner):
+    resultclass = FixtureResult
+
+
+class FixtureReadiness(unittest.TestCase):
+    def setUp(self):
+        reset_temporary_directories()
+
+    def test_bare_mktemp_missing_tmp_reproduces_original_failure(self):
+        moved = Path("/fixture/temporarily-missing-tmp")
+        self.assertFalse(moved.exists() or moved.is_symlink())
+        Path("/tmp").rename(moved)
+        try:
+            result = bare_mktemp()
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("missing_temporary_directory", diagnostic_summary(result.stderr)["categories"])
+        finally:
+            moved.rename("/tmp")
+        temporary_directory_readiness()
+
+    def test_initialized_temporary_directories_support_bare_mktemp(self):
+        temporary_directory_readiness()
+
+
 def load_executor():
     spec = importlib.util.spec_from_file_location("unchanged_executor", "/project/scripts/ssm/executor.py")
     module = importlib.util.module_from_spec(spec)
@@ -98,12 +228,13 @@ class Recovery(unittest.TestCase):
             target = Path("/project") / relative
             target.write_bytes(data)
             target.chmod(int(self.contract["files"][relative]["mode"], 8))
-        for name in ("/fixture", "/etc/nginx", "/usr/share/nginx", "/opt/aws/amazon-cloudwatch-agent", "/var/lib/aws-portfolio-deploy", "/var/backups/aws-portfolio-lab", "/var/tmp"):
+        for name in ("/fixture", "/etc/nginx", "/usr/share/nginx", "/opt/aws/amazon-cloudwatch-agent", "/var/lib/aws-portfolio-deploy", "/var/backups/aws-portfolio-lab"):
             target = Path(name)
             if target.exists():
                 shutil.rmtree(target)
             target.mkdir(parents=True)
-        Path("/var/tmp").chmod(0o1777)
+        reset_temporary_directories()
+        temporary_directory_readiness()
         self.page = Path("/usr/share/nginx/html/index.html")
         self.page.parent.mkdir(parents=True)
         self.page.write_bytes(self.approved["website/index.html"] + b"<!-- isolated predecessor -->\n")
@@ -156,7 +287,11 @@ class Recovery(unittest.TestCase):
         return subprocess.CompletedProcess(process.args, process.returncode, output, errors)
 
     def assert_code(self, result, code):
-        self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+        self.assertEqual(result.returncode, code, json.dumps(diagnostic_summary(result.stdout + result.stderr)))
+
+    def assert_verification_fault_once(self):
+        self.assertTrue(state().get("verification_failure_injected"))
+        self.assertEqual(state().get("injected_faults", []).count("verification_http"), 1)
 
     def assert_regular(self, path, mode):
         value = path.lstat()
@@ -332,6 +467,7 @@ class Recovery(unittest.TestCase):
             run_executor(self.coordinator_contract())
         record = self.record()
         self.assertEqual(record["scripts"]["verify-server.sh"], 30)
+        self.assert_verification_fault_once()
         self.assertEqual(record["recovery"], "baseline health and configuration verified")
         self.assertEqual(self.page.read_bytes(), self.before_page)
         self.assertFalse(self.source.exists())
@@ -350,6 +486,7 @@ class Recovery(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), before)
         self.assert_regular(self.source, 0o644)
         self.assertEqual(self.record()["recovery"], "baseline health and configuration verified")
+        self.assert_verification_fault_once()
 
     def test_latch_blocks_a_different_operation_without_new_record(self):
         state(verification_http_failure=True)
@@ -359,6 +496,7 @@ class Recovery(unittest.TestCase):
             run_executor(self.coordinator_contract(), "another-operation")
         self.assertTrue(self.marker.exists())
         self.assertFalse((self.control / "another-operation.json").exists())
+        self.assert_verification_fault_once()
 
     def test_completed_operation_cannot_be_replayed(self):
         run_executor(self.coordinator_contract())
@@ -372,6 +510,7 @@ class Recovery(unittest.TestCase):
         with self.assertRaises(SystemExit):
             run_executor(self.coordinator_contract())
         self.assertEqual(self.record()["recovery"], "baseline health and configuration verified")
+        self.assert_verification_fault_once()
         self.assertEqual(self.page.read_bytes(), self.before_page)
         import fcntl
         with (self.control / "deployment.lock").open("r+") as lock:
@@ -399,6 +538,7 @@ class Recovery(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
             executor.run(self.coordinator_contract())
         self.assertEqual(self.record()["recovery"], "operator recovery required; never retry blindly")
+        self.assert_verification_fault_once()
         self.assertTrue(self.marker.exists())
 
     def test_coordinator_timeout_skips_unsafe_automatic_recovery(self):
@@ -498,4 +638,4 @@ if __name__ == "__main__":
     if sys.argv[1:] == ["--worker"]:
         run_executor(json.loads(Path("/fixture/contract.json").read_text()))
     else:
-        unittest.main(verbosity=2)
+        unittest.main(verbosity=2, testRunner=FixtureRunner)

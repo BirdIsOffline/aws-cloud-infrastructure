@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("isolated_recovery_runner", ROOT / "tests/recovery_runner.py")
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
+suite_spec = importlib.util.spec_from_file_location("recovery_fixture_definitions", ROOT / "tests/recovery_suite.py")
+fixture_definitions = importlib.util.module_from_spec(suite_spec)
+suite_spec.loader.exec_module(fixture_definitions)
 
 
 class IsolationGuards(unittest.TestCase):
@@ -86,6 +89,26 @@ class IsolationGuards(unittest.TestCase):
         cases = [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")]
         self.assertGreaterEqual(len(cases), 25)
         self.assertTrue(all(not node.decorator_list for node in cases))
+
+    def test_diagnostic_categories_identify_missing_tmp_without_echoing_output(self):
+        private_text = "private-fixture-value-" + "x" * 40
+        summary = fixture_definitions.diagnostic_summary("mktemp: failed to create " + private_text + ": No such file or directory", {
+            "status": "failed", "failed_script": "verify-server.sh", "scripts": {"verify-server.sh": 1},
+            "stage": private_text, "recovery": "operator recovery required; never retry blindly"})
+        self.assertIn("missing_temporary_directory", summary["categories"])
+        self.assertEqual(summary["script_exit_codes"], {"verify-server.sh": 1})
+        self.assertNotIn(private_text, json.dumps(summary))
+
+    def test_diagnostic_output_is_allowlisted_and_bounded(self):
+        private_text = "private-fixture-value-" + "x" * 40
+        summary = fixture_definitions.diagnostic_summary(private_text * 2000, {
+            "status": private_text, "failed_script": private_text,
+            "scripts": {private_text: 1, "verify-server.sh": "untrusted", "bootstrap.sh": 9999},
+            "recovery": private_text})
+        self.assertEqual(summary["script_exit_codes"], {})
+        self.assertEqual(summary["status"], "unavailable")
+        self.assertNotIn(private_text, json.dumps(summary))
+        self.assertLess(len(json.dumps(summary)), 2048)
 
 
 if __name__ == "__main__":

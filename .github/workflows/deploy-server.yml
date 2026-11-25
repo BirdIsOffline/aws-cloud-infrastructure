@@ -1,0 +1,57 @@
+name: Deploy lab server
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Exact full commit SHA; must equal this dispatch revision and current main
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: lab-server-deployment
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Authorize revision and successful CI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      commit: ${{ steps.authorize.outputs.commit }}
+    env:
+      CD_COMMIT: ${{ inputs.commit }}
+      CD_GITHUB_OWNER_ID: ${{ vars.CD_GITHUB_OWNER_ID }}
+      CD_GITHUB_REPOSITORY_ID: ${{ vars.CD_GITHUB_REPOSITORY_ID }}
+      CD_ALLOWED_ACTOR_IDS: ${{ vars.CD_ALLOWED_ACTOR_IDS }}
+      CD_ROLE_ARN: ${{ vars.CD_ROLE_ARN }}
+      CD_INSTANCE_ID: ${{ vars.CD_INSTANCE_ID }}
+      CD_VPC_ID: ${{ vars.CD_VPC_ID }}
+      CD_SSM_DOCUMENT_SHA256: ${{ vars.CD_SSM_DOCUMENT_SHA256 }}
+    steps:
+      - name: Check out dispatch revision without credentials
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Authorize exact main revision and newest applicable CI
+        id: authorize
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B scripts/cd/delivery.py gate
+
+  deploy:
+    name: Deploy authorized release through restricted executor
+    needs: authorize
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/deploy-server-executor.yml
+    with:
+      commit: ${{ needs.authorize.outputs.commit }}

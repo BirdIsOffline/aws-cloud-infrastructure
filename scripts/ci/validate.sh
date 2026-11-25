@@ -8,6 +8,8 @@ for tool in python3 bash shellcheck git; do
   command -v "$tool" >/dev/null || { printf 'Missing CI prerequisite: %s\n' "$tool" >&2; exit 5; }
 done
 python3 scripts/ci/validate.py
+python3 -B scripts/ssm/bundle.py
+python3 -B -m unittest discover -s tests -p 'test_*.py'
 for script in scripts/*.sh scripts/ci/*.sh; do
   bash -n "$script"
   shellcheck "$script"

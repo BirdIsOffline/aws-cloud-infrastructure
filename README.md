@@ -1,7 +1,7 @@
 # AWS Cloud Infrastructure, Security & Automation
 
 A standalone AWS infrastructure project that combines Terraform adoption,
-Linux server automation, centralized monitoring, and local continuous integration.
+Linux server automation, centralized monitoring, and GitHub Actions integration.
 Existing infrastructure was imported into Terraform without resource recreation;
 server automation was then deployed through Systems Manager and verified for
 strict configuration idempotency.
@@ -37,9 +37,10 @@ flowchart LR
 
 ## Implemented capabilities
 
-- **Terraform adoption:** 27 managed resources and four data sources, with refreshed
-  plans verifying zero infrastructure changes. Terraform 1.17.2 and the committed
-  dependency lock select AWS provider 6.74.0. Resource relationships use references;
+- **Terraform:** 27 adopted resources plus six provisioned delivery security
+  resources, with four data sources and refreshed zero-change plans. Terraform
+  1.17.2 and the committed dependency lock select AWS provider 6.74.0.
+  Resource relationships use references;
   account-specific identifiers and state remain outside the repository.
 - **Security:** encrypted 8 GiB gp3 root storage, required IMDSv2, EC2 termination
   protection, and Terraform `prevent_destroy` guards on the VPC and instance.
@@ -62,25 +63,29 @@ flowchart LR
 | --- | --- |
 | Infrastructure adoption and configuration parity | Verified against AWS |
 | Controlled server deployment and strict idempotency | Verified on the lab instance |
-| GitHub Actions CI | Implemented and validated locally; first hosted run pending |
-| Authenticated continuous deployment | Designed; not implemented |
+| GitHub Actions CI | Hosted CI passed; new executor checks validated locally |
+| Deployment security infrastructure | Six resources provisioned and verified; 33 total managed resources |
+| Authenticated continuous delivery | Manual workflows implemented locally; publication and live tests pending |
 | Formal failure injection and rollback/recovery tests | Pending |
 
 The CI workflow runs on pushes to `main`, pull requests targeting `main`, and
 manual dispatch. It uses read-only repository permissions and full commit SHA
-action pins, with no AWS authentication or deployment steps. Planned CD uses a
-separate approval-gated OIDC role and scoped Systems Manager execution.
+action pins, with no AWS authentication or deployment steps. The separate manual
+delivery workflows use an exact-commit CI gate, a restricted OIDC role and pinned
+Systems Manager execution. Manual dispatch is not independent reviewer approval.
 
 ## Repository layout
 
 | Path | Purpose |
 | --- | --- |
-| `terraform/` | Adopted networking, EC2, IAM, CloudWatch, and SNS definitions |
+| `terraform/` | Adopted infrastructure and provisioned OIDC/IAM/SSM delivery security |
 | `scripts/` | Bootstrap, website deployment, monitoring, and server verification |
 | `scripts/ci/` | Reusable static validation and repository hygiene checks |
+| `scripts/cd/` | Manual authorization, exact-CI gating and bounded SSM orchestration |
+| `scripts/ssm/` | Pinned bundle validation and restricted server executor |
 | `config/` | Nginx security drop-in and CloudWatch Agent source configuration |
 | `website/` | Responsive static homepage with inline CSS |
-| `.github/workflows/` | AWS-free continuous integration |
+| `.github/workflows/` | AWS-free CI and separately authorized manual delivery |
 | `docs/` | Server baseline, deployment runbook, and CI/CD design |
 
 ## Local validation

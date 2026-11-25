@@ -1,4 +1,4 @@
-# Continuous integration and planned deployment
+# Continuous integration and manual delivery
 
 ## Current scope
 
@@ -13,7 +13,7 @@ a ten-minute timeout; Terraform validation has twenty minutes. Every failed chec
 fails its job. Terraform runs only after the source checks pass. There are no path
 filters that could skip checks while reporting a successful required workflow.
 
-The first actual GitHub run awaits separate repository publication approval.
+Hosted CI passed after the reviewed Windows/Linux provider checksum correction.
 Server automation previously passed strict live configuration idempotency;
 these CI checks do not execute it against any server or repeat that live test.
 
@@ -41,6 +41,10 @@ The reusable entry point runs:
   validator, not full W3C conformance, browser rendering, or CSS validation.
 - `bash -n` and ShellCheck at all default severities for all four server scripts
   and the CI shell entry point. Missing tools fail rather than silently skip.
+- The restricted executor bundle/size checks and local positive/negative unit
+  tests, including protections for all seven pinned files. These do not execute
+  the privileged deployment entry point. Native Windows skips real POSIX metadata
+  tests; those execute on a Linux CI runner after publication.
 
 Ubuntu runner images provide Bash, Python 3, Git, and ShellCheck. Their installed
 versions can change with image updates; no package installation or upgrade is part
@@ -72,9 +76,9 @@ artifact or cached by this workflow.
 The existing lock includes release archive checksums for multiple platforms. Local
 compatibility verification uses an isolated configuration copy, clean initialization,
 and Terraform's Linux AMD64 provider mirror download, comparing the archive against
-the unchanged lock and HashiCorp's release checksum manifest. A Windows initialization
-and Linux package verification do not replace executing init/validate on Ubuntu;
-the first GitHub-hosted run is still required for that end-to-end confirmation.
+the unchanged lock and HashiCorp's release checksum manifest. Hosted Ubuntu CI
+subsequently passed initialization and validation. New workflow/helper changes
+still require a successful hosted run after separately approved publication.
 
 ## Repository hygiene and action pins
 
@@ -93,9 +97,10 @@ the AMI lookup uses the provider's `amazon` owner alias.
 Keep `.terraform.lock.hcl` in version control. State, backups, `.terraform`, and
 real credentials must remain ignored and untracked. The pattern scanner is a
 guardrail, not comprehensive secret detection or a history scanner. Review Git's
-staged diff before publication; enable GitHub secret scanning/push protection and
-branch protections before publishing and enabling deployment. Never commit runtime SSM output,
-email subscription details, or recovery archives.
+staged diff before publication. Enable GitHub secret scanning, push protection and
+branch rules where available under the repository plan; retain mandatory local
+scans and operator review without assuming paid private-repository protections.
+Never commit runtime SSM output, email subscription details or recovery archives.
 
 External actions are pinned to full commit SHAs verified against official
 repository tag refs when this workflow was implemented:
@@ -104,61 +109,42 @@ repository tag refs when this workflow was implemented:
 | --- | --- | --- |
 | `actions/checkout` | v6.1.0 | `d23441a48e516b6c34aea4fa41551a30e30af803` |
 | `hashicorp/setup-terraform` | v4.0.1 | `dfe3c3f87815947d99a8997f908cb6525fc44e9e` |
+| `aws-actions/configure-aws-credentials` (CD only) | v6.3.0 | `e1253824e5c10ff9df46874f81ed3ec929e19cfd` |
 
 Update pins through reviewed changes after verifying the new commit belongs to the
 official repository and reviewing release notes. Local workflow validation uses
 actionlint where available; no unpinned lint action is introduced.
 
-## Proposed authenticated CD: separate approval required
+## Authenticated manual delivery
 
-Create a separate server-deployment workflow only after the CI workflow has run
-successfully. Initially make deployment manual, limited to protected `main` and a
-protected GitHub environment with required reviewers and restricted deployment
-branches. Require CI success for the exact immutable commit being deployed. Never
-deploy pull-request code, run privileged `pull_request_target` checkouts, or promote
-untrusted PR artifacts through a privileged `workflow_run` without verifying their
-origin and immutable source revision.
+The six restricted IAM/OIDC/SSM resources were separately provisioned and verified.
+Terraform now retains parity across 33 managed resources and four data sources.
+The manual caller and reusable executor workflows are implemented locally; they
+have not been published, dispatched or authenticated. See the
+[authenticated delivery security model](authenticated-delivery.md) for resource
+addresses, external identity inputs, supported trust claims, permission boundary,
+content-addressed executor, pinned inputs, limits, recovery, and revision procedure.
 
-Use GitHub OIDC with a dedicated, short-lived AWS deployment role, not access-key
-secrets or the EC2 instance role. Grant `id-token: write` only to the approved CD
-job. Restrict the role trust to audience `sts.amazonaws.com` and the exact repository
-and protected environment subject. Environment-based subjects do not also encode
-the branch: enforce `main` through the environment's deployment-branch rule and
-workflow conditions. Plan role/provider creation separately; this CI implementation
-creates neither a role nor an OIDC provider.
+The implementation uses manual dispatch from main and a dedicated reusable
+executor workflow, with successful CI for the exact source commit required before
+credentials. It does not depend on paid private-environment reviewer gates. Exact
+immutable owner/repository/actor IDs, branch, workflow name, and reusable workflow
+reference are required by IAM. Main-writer and operator trust remains explicit;
+manual dispatch is not independent two-person approval.
 
-Limit the future role to the required discovery, command execution/result polling,
-and scoped monitoring reads. Scope `ssm:SendCommand` to the verified lab instance
-and a reviewed deployment document; use resource/tag/region restrictions where
-the API supports them. Some describe/poll APIs need wildcard resources, which
-must be restricted to the smallest necessary action set. Sending arbitrary
-`AWS-RunShellScript` commands still grants root execution on the instance; prefer
-a dedicated SSM document with constrained parameters and an allowlisted deployment
-sequence. IAM/document design requires its own review.
+Deployment remains separate from Terraform infrastructure changes. It uses
+short-lived OIDC credentials, private integrity-checked SSM transfer, one lab
+instance/document, server-side locking, and no SSH, permanent AWS keys, new
+artifact-storage service, or automatic Terraform deployment. A constant concurrency
+group prevents automatic cancellation of running deployments. The helper verifies
+public HTTP, fresh telemetry, and seven-day log retention after server success.
+Publishing, authenticating or executing these workflows requires separate approval.
+The CI entry point now runs all `test_*.py` suites, including synthetic CD gating,
+input, private staging and polling tests. No test makes live deployment calls.
 
-The proposed deployment path is:
-
-1. Build the seven-file server bundle from the CI-validated immutable revision,
-   with an integrity manifest. Keep all state, secrets, and logs out of the bundle.
-2. Obtain temporary OIDC credentials after environment approval. Discover and verify
-   the existing named instance, custom VPC membership, running state, and SSM health.
-3. Transfer the small reviewed bundle using the validated compressed SSM wrapper,
-   checking payload limits, private root-owned staging, paths, permissions, LF,
-   checksums, and Linux syntax before executing anything. If future bundle growth
-   needs an artifact store, separately approve private, encrypted, tightly scoped
-   storage and immutable artifact references.
-4. Run the approved bootstrap, website deployment, monitoring configuration, and
-   verification scripts once in order. Preserve durable private recovery backups
-   and documented recovery behavior. Serialize deployments; do not cancel a running
-   deployment merely because a newer commit arrives.
-5. Verify local/public content, HTTP 404 for the former backup URL, services, active
-   cached Agent configuration, seven-day retention, and fresh telemetry. Emit only
-   redacted summaries and retain sensitive command/recovery data privately.
-
-The EC2 role continues to supply Agent permissions. CD needs neither inbound SSH
-nor security-group changes. Keep server deployment separate from any future
-Terraform infrastructure pipeline; automatic infrastructure deployment, Terraform
-state access, and plan/apply permissions are outside this design.
+See the [manual delivery runbook](manual-deployment.md) for the seven required
+repository variables, all eight trust conditions, exact-CI gate, pinned release
+procedure, failure handling and remaining live acceptance tests.
 
 References: [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use),
 [GitHub OIDC with AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws),

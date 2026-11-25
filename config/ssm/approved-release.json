@@ -1,0 +1,50 @@
+{
+  "format": 1,
+  "limits": {
+    "encoded_bytes": 16384,
+    "decoded_bytes": 49152,
+    "file_bytes": 16384
+  },
+  "baseline_homepage_sha256": [
+    "a9ea5480ab8778d47cb0edb7c69c57d9146a4a94090d02887dfcbe409812b034"
+  ],
+  "files": {
+    "scripts/bootstrap.sh": {
+      "sha256": "66d93808a4fba9b584d36169abfe99f0008dc32a63f4b53e1336eb0c4b6bd1aa",
+      "bytes": 1877,
+      "mode": "0700"
+    },
+    "scripts/deploy-website.sh": {
+      "sha256": "2abddfd251beb011a6b5de30c4e344cb4646212667ed1fd95bbe9a30640e4514",
+      "bytes": 7540,
+      "mode": "0700"
+    },
+    "scripts/configure-monitoring.sh": {
+      "sha256": "6af72c71a8494916f30c8c4377eebf6e041be527b5d4c29ae8380a588177ca2c",
+      "bytes": 8803,
+      "mode": "0700"
+    },
+    "scripts/verify-server.sh": {
+      "sha256": "b6a3f0e579bf2963e092321e12ffd61e41da56b6c98752bea8166595b6ec13bd",
+      "bytes": 2735,
+      "mode": "0700"
+    },
+    "config/nginx/security.conf": {
+      "sha256": "419a00ec534a021e83b3f0206dcd3434253de4f5ef5cda28e4e4247f56a5ed3f",
+      "bytes": 19,
+      "mode": "0600"
+    },
+    "config/cloudwatch/amazon-cloudwatch-agent.json": {
+      "sha256": "b8c57a42516edef42fca487840accafbfbd415b2428b6c06ead0f387f92557d7",
+      "bytes": 1074,
+      "mode": "0600"
+    },
+    "website/index.html": {
+      "sha256": "a9ea5480ab8778d47cb0edb7c69c57d9146a4a94090d02887dfcbe409812b034",
+      "bytes": 2481,
+      "mode": "0600"
+    }
+  },
+  "approved_from_commit": "940acec15a95e7d09b6678186f702b3f4b2cb814",
+  "document_name_prefix": "portfolio-lab-deploy-server"
+}

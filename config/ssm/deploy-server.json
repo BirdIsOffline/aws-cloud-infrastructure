@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "2.2",
+  "description": "Immutable reviewed lab executor; no arbitrary commands or paths",
+  "parameters": {
+    "Bundle": {
+      "type": "String",
+      "description": "Bounded gzip/base64 release envelope; all seven contents pinned by the executor",
+      "interpolationType": "ENV_VAR",
+      "allowedPattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "OperationId": {
+      "type": "String",
+      "description": "Unique workflow run and attempt identifier; repeats fail closed",
+      "interpolationType": "ENV_VAR",
+      "allowedPattern": "^[A-Za-z0-9_-]{1,64}$"
+    }
+  },
+  "mainSteps": [
+    {
+      "action": "aws:runShellScript",
+      "name": "RestrictedDeployment",
+      "precondition": { "StringEquals": ["platformType", "Linux"] },
+      "inputs": {
+        "timeoutSeconds": "900",
+        "runCommand": [
+          "set -eu\nexport PATH=/usr/sbin:/usr/bin:/sbin:/bin\nunset BASH_ENV ENV PYTHONPATH PYTHONHOME LD_PRELOAD LD_LIBRARY_PATH\nexec /usr/bin/python3 -I -B - <<'REVIEWED_EXECUTOR'\nimport base64, json\nnamespace = {'__name__': 'reviewed_executor'}\nexec(compile(base64.b64decode('__EXECUTOR_BASE64__'), '<reviewed-executor>', 'exec'), namespace)\nnamespace['run'](json.loads(base64.b64decode('__CONTRACT_BASE64__')))\nREVIEWED_EXECUTOR"
+        ]
+      }
+    }
+  ]
+}

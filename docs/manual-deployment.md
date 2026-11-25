@@ -5,9 +5,11 @@
 The caller, reusable executor, and local synthetic tests are implemented. The six
 OIDC/IAM/SSM security resources were separately provisioned and verified, bringing
 Terraform to 33 managed resources and four data sources with a zero-change plan.
-These new workflows have not been published, dispatched, or authenticated. No SSM
-deployment command has been sent through them. Earlier server deployment and
-idempotency tests do not establish this executor's live delivery or recovery.
+The first published run passed authorization, OIDC, restricted SSM execution, all
+four scripts and server checks, but failed automated telemetry freshness checks.
+Read-only follow-up confirmed idempotency and fresh telemetry. The corrections
+described here require a separately approved controlled live retest. Formal
+failure injection and recovery testing remain pending.
 
 ## Authorization and execution
 
@@ -50,17 +52,22 @@ recovery latch, including when GitHub cancellation releases its concurrency slot
 
 ## Repository configuration
 
-An operator must separately approve and configure these repository-level Actions
-variables under **Settings > Secrets and variables > Actions > Variables**. Real
-values remain outside source and documentation. The implementation changes no
-settings and has no permanent AWS access keys or inherited repository secrets.
+Deployment configuration has been migrated to repository-level **Actions secrets**
+under **Settings > Secrets and variables > Actions > Secrets**. All eight secret
+names were verified after encrypted upload, and the seven superseded variables
+were removed after compatibility checks. Secret values cannot be read back through
+the API; upload inputs were cross-checked with approved private/live values first.
+Real values remain outside source and documentation. No permanent AWS keys or
+variable fallback are used; reusable secrets are passed explicitly, without
+`secrets: inherit`.
 
-| Variable | Required value |
+| Repository secret | Required value |
 | --- | --- |
 | `CD_GITHUB_OWNER_ID` | Immutable owner ID from the approved live trust policy |
 | `CD_GITHUB_REPOSITORY_ID` | Immutable repository ID from that policy |
 | `CD_ALLOWED_ACTOR_IDS` | JSON array of numeric strings; exactly the approved actor list, one to five entries |
 | `CD_ROLE_ARN` | Provisioned `aws-lab-github-deploy-role` ARN |
+| `CD_ROLE_UNIQUE_ID` | Existing role's `RoleId`, available as private Terraform `unique_id` or through an approved operator GetRole query |
 | `CD_INSTANCE_ID` | Existing lab web instance ID |
 | `CD_VPC_ID` | Existing custom lab VPC ID |
 | `CD_SSM_DOCUMENT_SHA256` | Operator-verified AWS `DescribeDocument` SHA-256 for the approved version 1 |
@@ -141,29 +148,46 @@ GitHub run/attempt; the SSM comment also records the immutable commit. No other
 deployment document is permitted. Private local receipts record submission and
 acceptance; they are never published as artifacts.
 
-Polling is read-only, with a 1,050-second budget plus one request's timeout
-headroom. InvocationDoesNotExist is tolerated for the first 30 seconds only.
+Polling is read-only, with a 1,050-second budget including request timeouts.
+InvocationDoesNotExist is tolerated for the first 30 seconds only.
 Failure, cancellation, unknown status, unavailable polling, or a deadline stops
 the job without resubmitting or trying an independent rollback. The fixed plugin
 timeout remains 900 seconds. A valid success must identify the exact command,
 instance, document/version/plugin and report all four scripts at exit 0, local
 HTTP 200 and former-backup HTTP 404.
 
-After server success, public HTTP must return the exact approved homepage and
-404 for `/index.html.backup`. Both log groups must retain seven days. Within an
-additional 480-second monitoring budget, memory/disk metric timestamps and access
-log event/ingestion metadata must be newer than server success; historical points
-do not pass. The existing disk dimensions include root path and XFS. Error-stream
-metadata must exist; an idle error log is valid, so the workflow does not create
-synthetic errors or require a fresh error event. It never retrieves visitor logs,
-sets an alarm state, or publishes a test notification. Normal Agent activity and
-HTTP access naturally produce metrics/logs.
+After server success, round the freshness cutoff **up** to the next whole minute
+(preserve an already exact minute). Wait for that boundary, then make one health
+probe for the exact approved public homepage (HTTP 200) and former backup URL
+(HTTP 404). This produces access traffic in the eligible window. Alignment waiting,
+HTTP, retention/stream reads, metric queries and polling share a 480-second budget.
+
+Memory/disk queries use `Average` and 60-second periods; the Agent still collects
+every 300 seconds. StartTime is the safe cutoff and EndTime is rounded down to a
+completed minute. Only finite statistics in `[cutoff, EndTime)` qualify. Historical,
+overlapping, incomplete and future buckets are rejected. This avoids comparing
+five-minute bucket starts against a completion timestamp within that bucket.
+
+Fresh access-log **group ingestion** requires positive `Sum` datapoints from
+`AWS/Logs` / `IncomingLogEvents`, dimension `LogGroupName` equal to the access group,
+in the same safe window. Zero, missing, negative and historical points do not pass.
+This proves uploads into the group, which can include multiple streams or buffered
+older events; it does not prove individual-stream freshness or event creation time.
+Both expected instance streams must separately exist and both groups retain seven
+days. Neither `lastEventTimestamp` nor `lastIngestionTime` is used for freshness:
+these metadata fields are eventually consistent. Existing disk dimensions are
+preserved. An idle error stream is valid. No raw visitor logs, synthetic errors,
+alarm-state changes or notifications are used.
 
 ## Failure handling and operator recovery
 
-Job timeout is 35 minutes; the credential session is 30 minutes. Budgeted polling
-and monitoring normally fit that session; API delays, telemetry latency or expiry
-can still fail verification. A monitoring/HTTP verification failure after a
+Job timeout remains 35 minutes; the credential session remains 30 minutes. A
+conservative deadline starts during preparation, before authentication, with a
+90-second safety margin. Before sending, require 1,050 seconds for SSM polling,
+480 for monitoring and 60 reserve (1,590 total); otherwise nothing is submitted.
+Every AWS subprocess is bounded by its phase and credential deadlines, at most
+30 seconds per call. Expiry stops verification without reauthentication, alternate
+credentials or replay. SDK retries remain disabled. A monitoring/HTTP failure after a
 successful command is not permission to redeploy. Inspect the successful command
 and repeat only separately authorized read-only verification.
 
@@ -214,10 +238,46 @@ staging, single submission, eventual consistency, terminal failures and polling
 deadlines. Existing bundle tests exercise altered files, traversal, links, malformed
 compression and size limits. No test assumes a role or executes an SSM command.
 
-After publication approval, hosted CI must pass for the new workflows. Actual
-OIDC claims/STS exchange, live SSM acceptance and Linux executor operation, public
-HTTP/telemetry checks, cancellation handling and recovery have not been proven by
-these offline tests. Schedule each live test through separate approval.
+The first run proved live OIDC/STS and SSM execution, script success and server
+idempotency. The corrected verification and secret-based masking require hosted CI
+and a separately approved live run. Cancellation and recovery tests remain pending.
+Schedule each live test through separate approval.
+
+## Logging migration and previous exposure
+
+Runner step headers can print environment values before a script starts, so Python
+`add-mask` calls cannot retroactively protect repository-variable values. All eight
+inputs now use Actions secrets, registered for masking before runner logging, and
+are scoped to the steps that need them. Checkout receives no deployment secrets.
+The helper also masks derived account IDs and scalar actor IDs before exporting
+derived environment values, and validates STS UserId against `CD_ROLE_UNIQUE_ID`.
+
+The pinned AWS action logs the assumed-role unique ID. `mask-aws-account-id` alone
+does not cover it; supplying the existing RoleId as an Actions secret masks that
+substring before the action logs it. No IAM GetRole permission is added to CD:
+the separately authorized operator supplies the value. These identifiers are not
+authentication credentials; secrets are used here for log privacy. Trusted code
+and privileged repository administrators can still access the inputs. Never enable
+token dumps or log raw API responses, payloads or credentials.
+
+The eight secrets were created from verified private/live values; their names were
+confirmed before removing the obsolete variables. Future input changes require
+separate operator approval. Require successful CI for the exact current main commit
+and separate deployment approval before dispatch. An incomplete configuration fails
+closed before OIDC, without falling back to variables.
+
+Keep the repository private while reviewing the old deployment run logs, downloaded
+copies and artifacts. Preserve needed audit evidence privately with redactions;
+separately authorize deletion of affected GitHub run logs/artifacts before public
+publication. New secret masks do not redact old logs. Exposed resource identifiers
+alone do not warrant infrastructure replacement or access-key rotation. The first
+run's AWS credential fields were masked. No historical runs, logs or artifacts were
+deleted during the approved secret migration and publication.
+
+References for the correction: [CloudWatch query periods and rounding](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_GetMetricStatistics.html),
+[IncomingLogEvents](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch-Logs-Monitoring-CloudWatch-Metrics.html),
+[GitHub secrets and masking](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets),
+[pinned action's role ID logging](https://github.com/aws-actions/configure-aws-credentials/blob/e1253824e5c10ff9df46874f81ed3ec929e19cfd/src/index.ts#L261).
 
 Action pins were checked against official public release refs: checkout v6.1.0
 and configure-aws-credentials v6.3.0. Review future action revisions separately.

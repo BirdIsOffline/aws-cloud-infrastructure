@@ -6,6 +6,23 @@ on:
       commit:
         required: true
         type: string
+    secrets:
+      CD_GITHUB_OWNER_ID:
+        required: true
+      CD_GITHUB_REPOSITORY_ID:
+        required: true
+      CD_ALLOWED_ACTOR_IDS:
+        required: true
+      CD_ROLE_ARN:
+        required: true
+      CD_ROLE_UNIQUE_ID:
+        required: true
+      CD_INSTANCE_ID:
+        required: true
+      CD_VPC_ID:
+        required: true
+      CD_SSM_DOCUMENT_SHA256:
+        required: true
 
 permissions: {}
 
@@ -20,13 +37,6 @@ jobs:
       id-token: write
     env:
       CD_COMMIT: ${{ inputs.commit }}
-      CD_GITHUB_OWNER_ID: ${{ vars.CD_GITHUB_OWNER_ID }}
-      CD_GITHUB_REPOSITORY_ID: ${{ vars.CD_GITHUB_REPOSITORY_ID }}
-      CD_ALLOWED_ACTOR_IDS: ${{ vars.CD_ALLOWED_ACTOR_IDS }}
-      CD_ROLE_ARN: ${{ vars.CD_ROLE_ARN }}
-      CD_INSTANCE_ID: ${{ vars.CD_INSTANCE_ID }}
-      CD_VPC_ID: ${{ vars.CD_VPC_ID }}
-      CD_SSM_DOCUMENT_SHA256: ${{ vars.CD_SSM_DOCUMENT_SHA256 }}
       AWS_REGION: us-east-2
       AWS_DEFAULT_REGION: us-east-2
       AWS_EC2_METADATA_DISABLED: "true"
@@ -42,13 +52,21 @@ jobs:
       - name: Recheck authorization and prepare pinned private bundle
         env:
           GH_TOKEN: ${{ github.token }}
+          CD_GITHUB_OWNER_ID: ${{ secrets.CD_GITHUB_OWNER_ID }}
+          CD_GITHUB_REPOSITORY_ID: ${{ secrets.CD_GITHUB_REPOSITORY_ID }}
+          CD_ALLOWED_ACTOR_IDS: ${{ secrets.CD_ALLOWED_ACTOR_IDS }}
+          CD_ROLE_ARN: ${{ secrets.CD_ROLE_ARN }}
+          CD_ROLE_UNIQUE_ID: ${{ secrets.CD_ROLE_UNIQUE_ID }}
+          CD_INSTANCE_ID: ${{ secrets.CD_INSTANCE_ID }}
+          CD_VPC_ID: ${{ secrets.CD_VPC_ID }}
+          CD_SSM_DOCUMENT_SHA256: ${{ secrets.CD_SSM_DOCUMENT_SHA256 }}
         run: python3 -B scripts/cd/delivery.py prepare
       - name: Assume restricted deployment role with OIDC
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: us-east-2
           audience: sts.amazonaws.com
-          role-to-assume: ${{ vars.CD_ROLE_ARN }}
+          role-to-assume: ${{ secrets.CD_ROLE_ARN }}
           role-session-name: ${{ env.CD_SESSION_NAME }}
           role-duration-seconds: 1800
           allowed-account-ids: ${{ env.CD_ACCOUNT_ID }}
@@ -61,4 +79,12 @@ jobs:
       - name: Verify target, submit once, and verify delivery
         env:
           GH_TOKEN: ${{ github.token }}
+          CD_GITHUB_OWNER_ID: ${{ secrets.CD_GITHUB_OWNER_ID }}
+          CD_GITHUB_REPOSITORY_ID: ${{ secrets.CD_GITHUB_REPOSITORY_ID }}
+          CD_ALLOWED_ACTOR_IDS: ${{ secrets.CD_ALLOWED_ACTOR_IDS }}
+          CD_ROLE_ARN: ${{ secrets.CD_ROLE_ARN }}
+          CD_ROLE_UNIQUE_ID: ${{ secrets.CD_ROLE_UNIQUE_ID }}
+          CD_INSTANCE_ID: ${{ secrets.CD_INSTANCE_ID }}
+          CD_VPC_ID: ${{ secrets.CD_VPC_ID }}
+          CD_SSM_DOCUMENT_SHA256: ${{ secrets.CD_SSM_DOCUMENT_SHA256 }}
         run: python3 -B scripts/cd/delivery.py deploy

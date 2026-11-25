@@ -119,8 +119,11 @@ actionlint where available; no unpinned lint action is introduced.
 
 The six restricted IAM/OIDC/SSM resources were separately provisioned and verified.
 Terraform now retains parity across 33 managed resources and four data sources.
-The manual caller and reusable executor workflows are implemented locally; they
-have not been published, dispatched or authenticated. See the
+The first published caller/reusable run passed authorization, OIDC, SSM execution
+and all four scripts but failed its telemetry gate. Corrections use aligned minute
+queries, IncomingLogEvents and pre-registered Actions secrets. The eight secrets are
+configured and superseded variables removed; a controlled retest remains pending.
+See the
 [authenticated delivery security model](authenticated-delivery.md) for resource
 addresses, external identity inputs, supported trust claims, permission boundary,
 content-addressed executor, pinned inputs, limits, recovery, and revision procedure.
@@ -142,9 +145,11 @@ Publishing, authenticating or executing these workflows requires separate approv
 The CI entry point now runs all `test_*.py` suites, including synthetic CD gating,
 input, private staging and polling tests. No test makes live deployment calls.
 
-See the [manual delivery runbook](manual-deployment.md) for the seven required
-repository variables, all eight trust conditions, exact-CI gate, pinned release
-procedure, failure handling and remaining live acceptance tests.
+See the [manual delivery runbook](manual-deployment.md) for migration from seven
+variables to eight repository secrets, including the role unique ID masking input,
+all eight unchanged trust conditions, telemetry evidence limits, pinned release
+procedure, failure handling and remaining acceptance tests. Repository privacy and
+read-only default token permissions were preserved during the approved migration.
 
 References: [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use),
 [GitHub OIDC with AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws),

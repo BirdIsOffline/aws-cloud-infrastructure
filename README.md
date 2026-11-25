@@ -65,7 +65,7 @@ flowchart LR
 | Controlled server deployment and strict idempotency | Verified on the lab instance |
 | GitHub Actions CI | Hosted CI passed; new executor checks validated locally |
 | Deployment security infrastructure | Six resources provisioned and verified; 33 total managed resources |
-| Authenticated continuous delivery | Manual workflows implemented locally; publication and live tests pending |
+| Authenticated continuous delivery | OIDC/SSM and server idempotency verified; secrets migrated; corrected telemetry verification awaits controlled retest |
 | Formal failure injection and rollback/recovery tests | Pending |
 
 The CI workflow runs on pushes to `main`, pull requests targeting `main`, and

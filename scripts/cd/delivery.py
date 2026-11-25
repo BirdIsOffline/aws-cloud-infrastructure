@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import hashlib
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -26,6 +27,9 @@ REGION = "us-east-2"
 SCRIPTS = ("bootstrap.sh", "deploy-website.sh", "configure-monitoring.sh", "verify-server.sh")
 POLL_SECONDS = 1050
 MONITOR_SECONDS = 480
+SESSION_SECONDS = 1800
+SESSION_MARGIN = 90
+DEPLOYMENT_RESERVE = 60
 
 
 class Rejected(RuntimeError):
@@ -40,6 +44,10 @@ class InvocationMissing(RuntimeError):
     """The safe polling API has not yet observed the accepted command."""
 
 
+class CredentialsExpired(Rejected):
+    """Stop without refreshing credentials or replaying deployment."""
+
+
 def require(condition, message):
     if not condition:
         raise Rejected(message)
@@ -52,7 +60,7 @@ def fullmatch(pattern, value):
 def config(environment):
     cfg = {key: environment.get("CD_" + key, "") for key in (
         "COMMIT", "GITHUB_OWNER_ID", "GITHUB_REPOSITORY_ID", "ALLOWED_ACTOR_IDS",
-        "ROLE_ARN", "INSTANCE_ID", "VPC_ID", "SSM_DOCUMENT_SHA256"
+        "ROLE_ARN", "ROLE_UNIQUE_ID", "INSTANCE_ID", "VPC_ID", "SSM_DOCUMENT_SHA256"
     )}
     require(fullmatch(r"[0-9a-f]{40}", cfg["COMMIT"]), "Select a full lowercase commit SHA")
     for key in ("GITHUB_OWNER_ID", "GITHUB_REPOSITORY_ID"):
@@ -67,6 +75,7 @@ def config(environment):
     cfg["actors"] = set(actors)
     require(fullmatch(r"arn:aws:iam::[0-9]{12}:role/aws-lab-github-deploy-role", cfg["ROLE_ARN"]), "Unexpected deployment role configuration")
     cfg["account"] = cfg["ROLE_ARN"].split(":")[4]
+    require(fullmatch(r"AROA[A-Z0-9]{17}", cfg["ROLE_UNIQUE_ID"]), "Missing approved role unique ID for pre-authentication masking")
     require(fullmatch(r"i-[0-9a-f]{17}", cfg["INSTANCE_ID"]), "Invalid target instance configuration")
     require(fullmatch(r"vpc-[0-9a-f]{17}", cfg["VPC_ID"]), "Invalid lab VPC configuration")
     require(fullmatch(r"[0-9a-f]{64}", cfg["SSM_DOCUMENT_SHA256"]), "Missing approved AWS document SHA-256")
@@ -195,17 +204,34 @@ def prepare(cfg, environment):
     write_private(stage / "release.json", {"commit": cfg["COMMIT"], **data})
     session = "cd-" + environment["GITHUB_RUN_ID"] + "-1"
     with open(environment["GITHUB_ENV"], "a", encoding="utf-8") as output:
-        for key, value in {"CD_STAGE": str(stage), "CD_ACCOUNT_ID": cfg["account"], "CD_SESSION_NAME": session}.items():
+        for key, value in {"CD_STAGE": str(stage), "CD_ACCOUNT_ID": cfg["account"], "CD_SESSION_NAME": session,
+                           "CD_AUTH_DEADLINE": str(time.time() + SESSION_SECONDS - SESSION_MARGIN)}.items():
             output.write(key + "=" + value + "\n")
-    for value in (cfg["account"], cfg["ROLE_ARN"], cfg["INSTANCE_ID"], cfg["VPC_ID"]):
-        print("::add-mask::" + value)
+
+
+def mask_configuration(cfg):
+    # Secrets are registered before runner logging. Also mask derived scalar values.
+    values = [value for value in cfg.values() if isinstance(value, str)] + sorted(cfg["actors"])
+    for value in values:
+        escaped = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        if value != cfg["COMMIT"]:
+            print("::add-mask::" + escaped)
 
 
 class AWS:
-    def __init__(self):
+    def __init__(self, deadline=None, clock=time.monotonic):
         self.submitted = False
+        self.clock = clock
+        self.deadline = deadline if deadline is not None else clock() + SESSION_SECONDS - SESSION_MARGIN
 
-    def call(self, service, operation, *arguments):
+    def require_deployment_budget(self):
+        require(self.deadline - self.clock() >= POLL_SECONDS + MONITOR_SECONDS + DEPLOYMENT_RESERVE,
+                "Insufficient temporary credential budget for deployment and verification; nothing submitted")
+
+    def call(self, service, operation, *arguments, deadline=None):
+        remaining = min(self.deadline, deadline if deadline is not None else self.deadline) - self.clock()
+        if remaining <= 0:
+            raise CredentialsExpired("Credential or verification deadline reached; no reauthentication or redeployment")
         sending = (service, operation) == ("ssm", "send-command")
         if sending:
             require(not self.submitted, "A second submission is forbidden")
@@ -218,8 +244,9 @@ class AWS:
         try:
             result = subprocess.run([
                 "aws", service, operation, *arguments, "--region", REGION, "--output", "json",
-                "--no-cli-pager", "--cli-connect-timeout", "5", "--cli-read-timeout", "20"
-            ], env=env, capture_output=True, timeout=30, check=False)
+                "--no-cli-pager", "--cli-connect-timeout", str(max(1, min(5, int(remaining)))),
+                "--cli-read-timeout", str(max(1, min(20, int(remaining))))
+            ], env=env, capture_output=True, timeout=min(30, remaining), check=False)
         except (OSError, subprocess.TimeoutExpired):
             if sending:
                 raise Ambiguous("SSM submission outcome is unknown; operator inspection required, never resubmit") from None
@@ -227,6 +254,8 @@ class AWS:
         if result.returncode:
             if sending:
                 raise Ambiguous("SSM submission failed or outcome is unknown; operator inspection required, never resubmit")
+            if any(code in result.stderr for code in (b"(ExpiredToken)", b"(ExpiredTokenException)", b"(RequestExpired)")):
+                raise CredentialsExpired("Temporary AWS credentials expired; verification stopped without reauthentication or redeployment")
             if (service, operation) == ("ssm", "get-command-invocation") and b"(InvocationDoesNotExist)" in result.stderr:
                 raise InvocationMissing()
             raise Rejected("AWS read-only verification failed; response details withheld")
@@ -241,6 +270,7 @@ class AWS:
 def target(aws, cfg, session):
     identity = aws.call("sts", "get-caller-identity")
     require(identity.get("Account") == cfg["account"] and identity.get("Arn") == "arn:aws:sts::" + cfg["account"] + ":assumed-role/aws-lab-github-deploy-role/" + session, "Unexpected assumed role identity")
+    require(identity.get("UserId") == cfg["ROLE_UNIQUE_ID"] + ":" + session, "Assumed role unique identity differs from approved masking configuration")
     vpcs = aws.call("ec2", "describe-vpcs", "--vpc-ids", cfg["VPC_ID"])["Vpcs"]
     require(len(vpcs) == 1 and vpcs[0]["VpcId"] == cfg["VPC_ID"] and not vpcs[0]["IsDefault"] and vpcs[0]["CidrBlock"] == "10.20.0.0/16", "Lab VPC verification failed")
     require({tag["Key"]: tag["Value"] for tag in vpcs[0].get("Tags", [])}.get("Name") == "aws-cloud-lab-vpc", "Unexpected VPC name")
@@ -283,11 +313,11 @@ def poll(aws, command_id, cfg, data, clock=time.monotonic, sleep=time.sleep):
     started = clock()
     while clock() - started < POLL_SECONDS:
         try:
-            result = aws.call("ssm", "get-command-invocation", "--command-id", command_id, "--instance-id", cfg["INSTANCE_ID"], "--plugin-name", "RestrictedDeployment")
+            result = aws.call("ssm", "get-command-invocation", "--command-id", command_id, "--instance-id", cfg["INSTANCE_ID"], "--plugin-name", "RestrictedDeployment", deadline=started + POLL_SECONDS)
         except InvocationMissing:
             if clock() - started >= 30:
                 raise Ambiguous("Accepted command remains unobservable; operator inspection required") from None
-            sleep(5)
+            sleep(min(5, max(0, started + POLL_SECONDS - clock())))
             continue
         status = result.get("Status")
         if status == "Success":
@@ -296,7 +326,7 @@ def poll(aws, command_id, cfg, data, clock=time.monotonic, sleep=time.sleep):
         if status in {"Failed", "Cancelled", "TimedOut", "Cancelling"}:
             raise Ambiguous("SSM execution failed, was cancelled, or timed out; inspect recovery latch and command before any new dispatch")
         require(status in {"Pending", "InProgress", "Delayed"}, "Unknown SSM execution status; operator inspection required")
-        sleep(5)
+        sleep(min(5, max(0, started + POLL_SECONDS - clock())))
     raise Ambiguous("SSM polling deadline reached; command may still run, never automatically resubmit or roll back")
 
 
@@ -313,30 +343,59 @@ def http(address, path, status, expected=None):
 
 
 def timestamp(value):
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    require(parsed.tzinfo is not None, "Metric timestamp requires a timezone")
+    return parsed.timestamp()
 
 
-def monitoring(aws, cfg, since, clock=time.monotonic, sleep=time.sleep):
+def fresh_points(points, cutoff, end, statistic, positive=False):
+    # Never accept the partial minute containing deployment completion or future buckets.
+    for point in points:
+        value = point.get(statistic)
+        stamp = timestamp(point["Timestamp"])
+        if (cutoff <= stamp < end and stamp % 60 == 0 and isinstance(value, (float, int))
+                and not isinstance(value, bool) and math.isfinite(value) and (not positive or value > 0)):
+            return True
+    return False
+
+
+def monitoring(aws, cfg, since, clock=time.monotonic, sleep=time.sleep, wall=time.time, probe=None):
+    deadline = clock() + MONITOR_SECONDS
+    cutoff = math.ceil(since / 60) * 60
+    # The health requests must generate log events in a fully post-deployment minute.
+    delay = max(0, cutoff - wall())
+    require(delay < MONITOR_SECONDS, "Invalid post-deployment freshness cutoff")
+    if delay:
+        sleep(delay)
+    require(clock() < deadline and wall() >= cutoff, "Verification deadline reached before freshness cutoff")
+    if probe is not None:
+        probe()
+    def read(service, operation, *args):
+        require(clock() < deadline, "Telemetry verification deadline reached; do not redeploy")
+        return aws.call(service, operation, *args, deadline=deadline)
     groups = ("/aws/portfolio-lab/nginx/access", "/aws/portfolio-lab/nginx/error")
     for name in groups:
-        matched = [group for group in aws.call("logs", "describe-log-groups", "--log-group-name-prefix", name)["logGroups"] if group["logGroupName"] == name]
+        matched = [group for group in read("logs", "describe-log-groups", "--log-group-name-prefix", name)["logGroups"] if group["logGroupName"] == name]
         require(len(matched) == 1 and matched[0].get("retentionInDays") == 7, "Both log groups must retain seven-day retention")
-    start = clock()
-    while clock() - start < MONITOR_SECONDS:
+    while clock() < deadline:
+        end = math.floor(wall() / 60) * 60
         fresh_metrics = []
-        for name, extra in (("mem_used_percent", []), ("disk_used_percent", [{"Name": "path", "Value": "/"}, {"Name": "fstype", "Value": "xfs"}])):
-            dimensions = [{"Name": "InstanceId", "Value": cfg["INSTANCE_ID"]}, *extra]
-            points = aws.call("cloudwatch", "get-metric-statistics", "--namespace", "AWSPortfolioLab", "--metric-name", name, "--dimensions", json.dumps(dimensions), "--start-time", datetime.fromtimestamp(since, timezone.utc).isoformat(), "--end-time", datetime.now(timezone.utc).isoformat(), "--period", "300", "--statistics", "Average")["Datapoints"]
-            fresh_metrics.append(any(timestamp(point["Timestamp"]) >= since for point in points))
         fresh_access = False
+        if end > cutoff:
+            def metric(namespace, name, dimensions, statistic):
+                points = read("cloudwatch", "get-metric-statistics", "--namespace", namespace, "--metric-name", name,
+                              "--dimensions", json.dumps(dimensions), "--start-time", datetime.fromtimestamp(cutoff, timezone.utc).isoformat(),
+                              "--end-time", datetime.fromtimestamp(end, timezone.utc).isoformat(), "--period", "60", "--statistics", statistic)["Datapoints"]
+                return fresh_points(points, cutoff, end, statistic, positive=statistic == "Sum")
+            for name, extra in (("mem_used_percent", []), ("disk_used_percent", [{"Name": "path", "Value": "/"}, {"Name": "fstype", "Value": "xfs"}])):
+                fresh_metrics.append(metric("AWSPortfolioLab", name, [{"Name": "InstanceId", "Value": cfg["INSTANCE_ID"]}, *extra], "Average"))
+            fresh_access = metric("AWS/Logs", "IncomingLogEvents", [{"Name": "LogGroupName", "Value": groups[0]}], "Sum")
         for name in groups:
-            streams = [stream for stream in aws.call("logs", "describe-log-streams", "--log-group-name", name, "--log-stream-name-prefix", cfg["INSTANCE_ID"])["logStreams"] if stream["logStreamName"] == cfg["INSTANCE_ID"]]
+            streams = [stream for stream in read("logs", "describe-log-streams", "--log-group-name", name, "--log-stream-name-prefix", cfg["INSTANCE_ID"])["logStreams"] if stream["logStreamName"] == cfg["INSTANCE_ID"]]
             require(len(streams) == 1, "Expected existing instance log stream missing")
-            if name == groups[0]:
-                fresh_access = streams[0].get("lastIngestionTime", 0) / 1000 >= since and streams[0].get("lastEventTimestamp", 0) / 1000 >= since
-        if all(fresh_metrics) and fresh_access:
+        if len(fresh_metrics) == 2 and all(fresh_metrics) and fresh_access:
             return
-        sleep(15)
+        sleep(min(15, max(0, deadline - clock())))
     raise Rejected("Fresh post-deployment metrics or access-log ingestion not observed; do not redeploy to retry verification")
 
 
@@ -359,6 +418,7 @@ def deploy(cfg, environment, api, aws):
     document(aws, cfg, data)
     http(address, "/", 200)  # Check availability before submitting a command.
     authorize(environment, json.loads(Path(environment["GITHUB_EVENT_PATH"]).read_text()), api)
+    aws.require_deployment_budget()
     operation = session
     payload = {
         "InstanceIds": [cfg["INSTANCE_ID"]], "DocumentName": data["document_name"],
@@ -380,11 +440,12 @@ def deploy(cfg, environment, api, aws):
     require(command.get("DocumentName") == data["document_name"] and command.get("DocumentVersion") == "1" and command.get("InstanceIds") == [cfg["INSTANCE_ID"]], "Accepted command target or executor differs; operator inspection required")
     poll(aws, command_id, cfg, data)
     since = time.time()  # Strictly newer observations; historical datapoints do not qualify.
-    http(address, "/", 200, (ROOT / "website/index.html").read_bytes())
-    http(address, "/index.html.backup", 404)
-    monitoring(aws, cfg, since)
+    def health_probe():
+        http(address, "/", 200, (ROOT / "website/index.html").read_bytes())
+        http(address, "/index.html.backup", 404)
+    monitoring(aws, cfg, since, probe=health_probe)
     with open(environment["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
-        output.write("Deployment verified for commit `" + cfg["COMMIT"] + "`. All four scripts succeeded; local/public HTTP, backup protection, fresh telemetry and seven-day retention passed.\n")
+        output.write("Deployment verified for commit `" + cfg["COMMIT"] + "`. All four scripts succeeded; local/public HTTP, backup protection, fresh memory/disk samples, access-log-group ingestion, expected stream existence and seven-day retention passed. Group ingestion is not individual-stream freshness evidence.\n")
     print("PASS: approved deployment, HTTP health and fresh monitoring verified; identifiers withheld.")
 
 
@@ -393,6 +454,7 @@ def main():
     parser.add_argument("phase", choices=("gate", "prepare", "deploy"))
     phase = parser.parse_args().phase
     environment = os.environ
+    mask_configuration(config(environment))
     api = GitHub(environment.get("GH_TOKEN"))
     event = json.loads(Path(environment["GITHUB_EVENT_PATH"]).read_text())
     cfg = authorize(environment, event, api)
@@ -404,7 +466,9 @@ def main():
         prepare(cfg, environment)
         print("PASS: repeated authorization and seven-file private release preparation; no AWS authentication yet.")
     else:
-        deploy(cfg, environment, api, AWS())
+        remaining = float(environment["CD_AUTH_DEADLINE"]) - time.time()
+        require(0 < remaining <= SESSION_SECONDS - SESSION_MARGIN, "Invalid or expired credential verification budget")
+        deploy(cfg, environment, api, AWS(deadline=time.monotonic() + remaining))
 
 
 if __name__ == "__main__":

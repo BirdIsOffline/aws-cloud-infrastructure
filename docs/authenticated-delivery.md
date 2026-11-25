@@ -4,9 +4,11 @@
 
 Six Terraform security resources were separately provisioned from the approved
 saved plan and verified live. State now retains 33 managed resources and four data
-sources, with a refreshed zero-change plan. Manual caller and reusable executor
-workflows are implemented locally but have not been published, authenticated or
-executed. The [manual delivery runbook](manual-deployment.md) covers workflow
+sources, with a refreshed zero-change plan. The first published manual run proved
+OIDC, restricted SSM execution and server idempotency, but its telemetry gate failed.
+Freshness and secret-masking corrections are implemented and the eight repository
+secrets are configured; a separately approved controlled live retest remains pending.
+The [manual delivery runbook](manual-deployment.md) covers workflow
 authorization, required variables and remaining live tests. Terraform 1.17.2 and
 the locked AWS provider 6.74.0 remain unchanged.
 

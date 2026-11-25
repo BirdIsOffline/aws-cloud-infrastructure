@@ -23,6 +23,7 @@ def environment():
         "CD_COMMIT": SHA, "CD_GITHUB_OWNER_ID": "101", "CD_GITHUB_REPOSITORY_ID": "202",
         "CD_ALLOWED_ACTOR_IDS": '["303"]',
         "CD_ROLE_ARN": "arn:aws:iam::" + "1" * 12 + ":role/aws-lab-github-deploy-role",
+        "CD_ROLE_UNIQUE_ID": "AROA" + "A" * 17,
         "CD_INSTANCE_ID": "i-" + "a" * 17, "CD_VPC_ID": "vpc-" + "b" * 17,
         "CD_SSM_DOCUMENT_SHA256": "c" * 64,
         "GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted",
@@ -240,9 +241,9 @@ class DocumentsAndMonitoring(unittest.TestCase):
         instance = {"InstanceId": cfg["INSTANCE_ID"], "VpcId": cfg["VPC_ID"], "State": {"Name": "running"},
                     "Tags": [{"Key": "Name", "Value": "aws-lab-web-01"}], "PublicIpAddress": "synthetic-address"}
         info = {"InstanceId": cfg["INSTANCE_ID"], "PingStatus": "Online", "AgentVersion": "3.3.2746.0"}
-        def response(service, operation, *args):
+        def response(service, operation, *args, **kwargs):
             if operation == "get-caller-identity":
-                return {"Account": cfg["account"], "Arn": "arn:aws:sts::" + cfg["account"] + ":assumed-role/aws-lab-github-deploy-role/" + session}
+                return {"Account": cfg["account"], "Arn": "arn:aws:sts::" + cfg["account"] + ":assumed-role/aws-lab-github-deploy-role/" + session, "UserId": cfg["ROLE_UNIQUE_ID"] + ":" + session}
             if operation == "describe-vpcs":
                 return {"Vpcs": [vpc]}
             if operation == "describe-instances":
@@ -282,7 +283,7 @@ class DocumentsAndMonitoring(unittest.TestCase):
     def test_historical_metrics_and_logs_do_not_count_as_fresh(self):
         cfg = delivery.config(environment())
         clock = Clock()
-        def response(service, operation, *args):
+        def response(service, operation, *args, **kwargs):
             if operation == "describe-log-groups":
                 return {"logGroups": [{"logGroupName": args[-1], "retentionInDays": 7}]}
             if operation == "get-metric-statistics":
@@ -296,11 +297,11 @@ class DocumentsAndMonitoring(unittest.TestCase):
 
     def test_fresh_metrics_ingestion_and_retention_pass(self):
         cfg = delivery.config(environment())
-        def response(service, operation, *args):
+        def response(service, operation, *args, **kwargs):
             if operation == "describe-log-groups":
                 return {"logGroups": [{"logGroupName": args[-1], "retentionInDays": 7}]}
             if operation == "get-metric-statistics":
-                return {"Datapoints": [{"Timestamp": "2001-09-09T02:00:00Z", "Average": 1}]}
+                return {"Datapoints": [{"Timestamp": "2001-09-09T02:00:00Z", "Average": 1, "Sum": 1}]}
             return {"logStreams": [{"logStreamName": cfg["INSTANCE_ID"], "lastIngestionTime": 1_000_000_100_000, "lastEventTimestamp": 1_000_000_100_000}]}
         aws = mock.Mock()
         aws.call.side_effect = response
@@ -326,7 +327,7 @@ class PrivateRelease(unittest.TestCase):
         with mock.patch.object(delivery, "release", return_value={"document_content": "synthetic"}), self.assertRaisesRegex(delivery.Rejected, "approved document hash"):
             delivery.prepare(delivery.config(environment()), environment())
 
-    def test_orchestrator_submits_once_with_exact_version_hash_and_files(self):
+    def deployment_case(self, verification_error=None):
         parent = ROOT / ".local/tests"
         parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=parent) as temporary:
@@ -342,12 +343,18 @@ class PrivateRelease(unittest.TestCase):
             import hashlib
             cfg = delivery.config(env)
             cfg["SSM_DOCUMENT_SHA256"] = hashlib.sha256(data["document_content"].encode()).hexdigest()
-            with mock.patch.object(delivery, "ROOT", root), mock.patch.object(delivery, "release", return_value=data), mock.patch.object(delivery, "target", return_value="synthetic-address"), mock.patch.object(delivery, "document"), mock.patch.object(delivery, "http"), mock.patch.object(delivery, "authorize"), mock.patch.object(delivery, "poll"), mock.patch.object(delivery, "monitoring"), mock.patch("builtins.print"):
+            with mock.patch.object(delivery, "ROOT", root), mock.patch.object(delivery, "release", return_value=data), mock.patch.object(delivery, "target", return_value="synthetic-address"), mock.patch.object(delivery, "document"), mock.patch.object(delivery, "http"), mock.patch.object(delivery, "authorize"), mock.patch.object(delivery, "poll"), mock.patch.object(delivery, "monitoring") as monitoring, mock.patch("builtins.print"):
                 delivery.prepare(cfg, env)
                 env.update(dict(line.split("=", 1) for line in Path(env["GITHUB_ENV"]).read_text().splitlines()))
                 aws = mock.Mock()
                 aws.call.return_value = {"Command": {"CommandId": COMMAND, "DocumentName": data["document_name"], "DocumentVersion": "1", "InstanceIds": [cfg["INSTANCE_ID"]]}}
-                delivery.deploy(cfg, env, mock.Mock(), aws)
+                monitoring.side_effect = verification_error
+                if verification_error is None:
+                    delivery.deploy(cfg, env, mock.Mock(), aws)
+                else:
+                    with self.assertRaises(type(verification_error)):
+                        delivery.deploy(cfg, env, mock.Mock(), aws)
+                    self.assertTrue((Path(env["CD_STAGE"]) / "accepted.json").exists())
                 payload = json.loads((Path(env["CD_STAGE"]) / "command.json").read_text())
                 self.assertEqual(payload["DocumentVersion"], "1")
                 self.assertEqual(payload["DocumentHash"], cfg["SSM_DOCUMENT_SHA256"])
@@ -356,6 +363,15 @@ class PrivateRelease(unittest.TestCase):
                 with self.assertRaises(FileExistsError):
                     delivery.deploy(cfg, env, mock.Mock(), aws)
                 aws.call.assert_called_once()
+
+    def test_orchestrator_submits_once_with_exact_version_hash_and_files(self):
+        self.deployment_case()
+
+    def test_no_redeployment_after_telemetry_verification_failure(self):
+        self.deployment_case(delivery.Rejected("Fresh telemetry not observed"))
+
+    def test_no_redeployment_after_verification_credential_expiration(self):
+        self.deployment_case(delivery.CredentialsExpired("Temporary credentials expired"))
 
 
 if __name__ == "__main__":

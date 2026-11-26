@@ -1,6 +1,6 @@
 # Server configuration baseline
 
-The instance is stopped during CI-only publication preparation. Service health
+The instance is stopped in the current CI-only operating mode. Service health
 and package versions below record the verified running baseline, not current
 availability. Publication work does not start or reconfigure the server.
 
@@ -124,9 +124,10 @@ Local Bash syntax, JSON/HTML checks, source inspections, LF checks, and help-onl
 execution do not prove Linux deployment behavior. Controlled server tests verified
 Nginx configuration integration, Agent translation/schema checks, local/public HTTP,
 service health, fresh metrics/log delivery, and strict repeat-run idempotency.
-The hosted Linux harness passed 31 isolated recovery cases and two readiness
-guards within 114 total tests. Live website restoration passed; Agent restoration
-recovered healthy monitoring but did not complete its full verification and is
+The latest hosted Linux suite passed 121 Python tests, including 31 isolated
+recovery cases and two readiness guards, plus one mocked Terraform test. The
+historical recovery baseline passed 114 tests. Live website restoration passed;
+Agent restoration recovered healthy monitoring but did not complete its full verification and is
 closed with limitations. The [testing record](recovery-testing.md) documents these
 boundaries and the 225 separate private offline checks. An Agent activation may
 regenerate cached/generated files or update metadata even with unchanged content;

@@ -9,7 +9,9 @@ confirmation does not retroactively turn them into passing recovery tests.
 
 | Evidence | Result | Verification boundary |
 | --- | --- | --- |
-| Hosted Ubuntu CI | 114 tests passed, zero skips/failures/errors | 81 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
+| Latest hosted Ubuntu CI | 121 Python tests passed, zero skips/failures/errors | 88 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
+| Mocked Terraform test | One run passed with seven assertions | Offline denial, sensitivity, boundary/role and public-IP creation checks; no AWS apply |
+| Historical hosted recovery baseline | 114 tests passed, zero skips/failures/errors | 81 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
 | Private operator-wrapper checks | 225 passed: 170 server, 31 controller, 24 observer | Offline replay/adapters and negative cases; separate from repository CI and live recovery |
 | OIDC-authenticated delivery | End-to-end success after telemetry correction | Exact-commit authorization, temporary role assumption, restricted SSM, four zero exits, HTTP, monitoring and masking |
 | Live idempotency | Strict configuration idempotency demonstrated | Compliant-file content/metadata, packages, service identities and backup inventory unchanged |
@@ -17,10 +19,13 @@ confirmation does not retroactively turn them into passing recovery tests.
 | Live Agent restoration | Monitoring recovered; complete verification did not pass | Baseline/metadata-classification gaps and final preflight abort are recorded below |
 | CloudWatch-to-SNS notification | Successful action and operator-confirmed matching email | One simulated ALARM transition; no genuine CPU threshold breach |
 
-The successful hosted result is recorded at
+The latest verified hosted result is recorded at
+[CI run 45759551505](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45759551505)
+for commit `f6a5976faaabb401aa06f056b9c06d74b2d3b156`: 121 Python tests plus
+one mocked Terraform test, with zero skips. The historical recovery baseline is at
 [CI run 45578485098](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45578485098)
-for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. The repository is
-private, so viewing that run requires access. Private operator evidence and its
+for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. Run visibility
+follows repository access settings. Private operator evidence and its
 225-check harness are not included in the public source or the hosted test total.
 
 ## Live deployment and strict idempotency
@@ -221,10 +226,13 @@ identity stops cleanup. It never accepts an arbitrary deletion directory.
 
 Local checks can establish syntax, source hygiene, release integrity, portable
 guard behavior, regression results, and static tooling results. They cannot
-establish Linux recovery success on Windows. The corrected hosted run executed
-81 ordinary tests, 31 recovery cases and two Linux readiness guards:
+establish Linux recovery success on Windows. The historical corrected recovery
+run executed 81 ordinary tests, 31 recovery cases and two Linux readiness guards:
 114 total, zero skips. The 225 private offline checks are a separate result and
 must not be added to that hosted total or described as reproducible repository CI.
+The latest verified suite adds seven Python lifecycle-contract tests, for 121
+Python tests, plus one fully mocked Terraform test; it does not add another live
+recovery outcome or change the Agent-verification limitations.
 
 The Linux harness demonstrates simulated recovery with command substitutes.
 The live outcomes and Agent limitations are documented above. Cancellation,

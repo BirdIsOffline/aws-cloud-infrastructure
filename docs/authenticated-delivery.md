@@ -2,8 +2,8 @@
 
 ## Current operating mode
 
-Delivery is suspended for CI-only publication. Both GitHub CD workflows are
-disabled. The dedicated deployment trust has an unconditional federation deny
+Delivery is disabled in the current CI-only operating mode. Both GitHub CD
+workflows are disabled. The dedicated deployment trust has an unconditional federation deny
 and no allow; the existing attached deployment policy also denies all actions
 and resources, covering previously issued sessions after IAM propagation. The
 permissions boundary, OIDC provider, instance role and pinned executor are
@@ -49,7 +49,8 @@ configuration: `TF_VAR_github_deployment_identity` or an ignored variable file.
 The object contains numeric-string `owner_id`, `repository_id`, and a nonempty
 set of one to five explicitly approved `actor_ids`. There are no real IDs or
 permissive defaults in source. The variable is sensitive to redact Terraform UI
-output; resulting trust-policy values will still exist in private Terraform state.
+output; the inputs no longer grant deployment access. Terraform state and saved
+plans still contain operational identifiers and must remain private.
 
 Before suspension, the approved trust used `StringEquals` for all of:
 
@@ -262,9 +263,11 @@ do not create unreviewed versions under an authorized document name.
    disabled, in addition to the server lock.
 
 Local tests prove decoder/input behavior, not live IAM enforcement or service
-activation. Hosted Linux CI passed all 114 tests without skips, including POSIX
-checks and isolated recovery. Live delivery and website restoration also passed;
-complete live Agent recovery verification did not. The
+activation. Latest hosted CI passed 121 Python tests and one mocked Terraform
+test, with zero skips, including POSIX checks and isolated recovery. The earlier
+114-test recovery baseline remains a separate historical result. Live delivery
+and website restoration also passed; complete live Agent recovery verification
+did not. The
 [testing record](recovery-testing.md) owns the evidence and boundaries, including
 the 225 separate private offline checks. Native Windows cannot execute the Linux
 isolation cases and reports that limitation explicitly.

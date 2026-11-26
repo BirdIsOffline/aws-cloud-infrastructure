@@ -1,8 +1,9 @@
 # Server deployment runbook
 
-During CI-only publication preparation the instance is stopped and GitHub
-delivery is disabled. These retained operator procedures require separate
-authorization; they do not reactivate federation or authorize an instance start.
+The current operating mode is CI only: the instance is stopped and GitHub
+delivery is disabled, independently of repository visibility. These retained
+operator procedures require separate authorization; they do not reactivate
+federation or authorize an instance start.
 
 The [isolated recovery harness](recovery-testing.md) exercises failure and rollback
 paths with disposable Linux files and command substitutes. It never connects to

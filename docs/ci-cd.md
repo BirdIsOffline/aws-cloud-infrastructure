@@ -19,6 +19,12 @@ The published recovery baseline passed all 114 tests with zero skips: 81 ordinar
 recorded results and limits; the separate 225 private offline checks are not
 part of this CI count.
 
+Latest verified hosted CI passed **121 Python tests and one mocked Terraform
+test**, with zero skips: 88 ordinary Python tests, 31 recovery cases, two Linux
+readiness guards, and a separate mocked Terraform run with seven assertions.
+[CI run 45759551505](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45759551505)
+records that result for commit `f6a5976faaabb401aa06f056b9c06d74b2d3b156`.
+
 ## Current scope
 
 `.github/workflows/ci.yml` validates public source only. It runs on pushes to
@@ -103,8 +109,8 @@ the retained boundary and EC2 service role, trust-policy sensitivity, and the
 explicit public-IP creation setting. It does not apply against AWS or use the
 adopted state. Seven additional Python contract tests restrict the lifecycle
 exception to that one attribute and preserve destruction protection. These
-publication checks extend the recorded 114-test baseline; see the exact revision's
-Actions results for their hosted outcome.
+checks extend the historical 114-test baseline and passed in the latest verified
+hosted run above. Review Actions results for any later source revision.
 
 The existing lock includes release archive checksums for multiple platforms. Local
 compatibility verification uses an isolated configuration copy, clean initialization,
@@ -148,6 +154,35 @@ Update pins through reviewed changes after verifying the new commit belongs to t
 official repository and reviewing release notes. Local workflow validation uses
 actionlint where available; no unpinned lint action is introduced.
 
+## Repository protections and solo maintenance
+
+CI-only operation is independent of repository visibility. Both CD workflows
+remain disabled and both AWS deployment denial controls remain in force. The
+retained CD implementation still requires a private original repository; changing
+visibility does not adapt that gate or authorize delivery.
+
+Repository policy requires full-length action SHAs. The two approved CI actions
+are `actions/checkout` and `hashicorp/setup-terraform` at the exact pins above.
+Where GitHub supports an action allowlist, allow only those two pins, with broad
+GitHub-owned and verified-creator allowances disabled. The retained CD credential
+action is not part of the CI allowlist. Keep default workflow tokens read-only,
+workflow PR creation/approval disabled, and fork secrets/write tokens unavailable.
+Require maintainer approval for all external-contributor workflows where supported.
+
+The intended `main` protection requires pull requests, both named CI jobs from
+the GitHub Actions app, up-to-date branches, resolved conversations, and no force
+pushes or branch deletion. Apply protections to administrators without routine
+bypass. This is a solo project: require **zero approving reviewers**, no code-owner
+approval, and no independent approval of the latest push. Pull requests and CI
+remain required; they do not constitute independent two-person review.
+
+GitHub feature availability depends on visibility and plan. Free private
+repositories cannot enforce every protection above; do not describe unavailable
+settings as active. Verify branch protection, the exact action allowlist, external
+workflow approvals, secret scanning and push protection during an independently
+approved public cutover before re-enabling public CI. This guide does not authorize
+a visibility change, subscription purchase, or restoration of deployment access.
+
 ## Authenticated manual delivery
 
 The six restricted IAM/OIDC/SSM resources were separately provisioned and verified.
@@ -189,6 +224,9 @@ boundaries. Repository privacy and
 read-only default token permissions were preserved during the approved migration.
 
 References: [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use),
+[repository Actions settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository),
+[protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches),
+[secret scanning availability](https://docs.github.com/en/code-security/how-tos/secure-your-secrets/detect-secret-leaks/enable-secret-scanning),
 [GitHub OIDC with AWS](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-aws),
 [SSM Run Command setup](https://docs.aws.amazon.com/systems-manager/latest/userguide/run-command-setting-up.html),
 [Terraform init](https://developer.hashicorp.com/terraform/cli/commands/init),

@@ -1,6 +1,6 @@
 # Architecture diagram
 
-The delivery path is currently suspended for CI-only publication. Both CD
+The delivery path is disabled in the current CI-only operating mode. Both CD
 workflows are disabled, the role denies federation, and its managed policy denies
 session service permissions. The diagram preserves the implemented architecture
 and marks this operational suspension; CI remains active.

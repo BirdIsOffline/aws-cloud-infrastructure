@@ -8,7 +8,7 @@ saved plan. Refreshed plans verified zero infrastructure changes after adoption
 and after provisioning. These are recorded verification results, not a continuous
 drift guarantee.
 
-## CI-only publication suspension
+## CI-only operating mode
 
 The dedicated GitHub deployment role now has a deny-only federation trust, and
 its existing managed policy contains an unconditional deny for all actions and
@@ -81,7 +81,7 @@ additional resources.
 | Resource address | Count | Responsibility |
 | --- | ---: | --- |
 | `aws_iam_openid_connect_provider.github` | 1 | GitHub issuer and STS audience |
-| `aws_iam_role.github_deploy` | 1 | Deny-only federation during CI-only publication |
+| `aws_iam_role.github_deploy` | 1 | Deny-only federation in CI-only mode |
 | `aws_iam_policy.github_deploy` | 1 | Dedicated delivery policy with unconditional permissions deny |
 | `aws_iam_role_policy_attachment.github_deploy` | 1 | Attach delivery permissions |
 | `aws_iam_policy.github_deploy_boundary` | 1 | Independent permission ceiling |

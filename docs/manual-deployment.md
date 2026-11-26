@@ -1,6 +1,6 @@
 # Manual GitHub Actions delivery
 
-## Suspension for CI-only publication
+## CI-only operating mode
 
 Both delivery workflows are disabled at repository level, and AWS denies new
 federation and service permissions for the dedicated deployment role's sessions.
@@ -19,7 +19,8 @@ The corrected controlled live deployment passed exact-commit authorization,
 OIDC/STS, one restricted SSM execution, four zero script exits, strict idempotency,
 HTTP, fresh telemetry, retention and runtime masking checks. The earlier run's
 telemetry-verification failure remains recorded. Hosted CI subsequently passed
-114 tests with zero skips, including isolated recovery. See the
+the historical 114-test recovery baseline. Latest hosted CI passed 121 Python
+tests plus one mocked Terraform test with zero skips. See the
 [testing record](recovery-testing.md) for live website restoration, confirmed
 simulated alarm-to-email delivery and the closed Agent-verification limitations.
 
@@ -90,16 +91,17 @@ inputs. The configured AWS hash must also equal the locally rendered document ha
 
 The verified deployment setup used repository Actions with the pinned official
 `actions/checkout` and `aws-actions/configure-aws-credentials` actions. During
-CI-only publication, leave both delivery workflows disabled. Keep default workflow token
+CI-only operation, leave both delivery workflows disabled regardless of repository
+visibility. Keep default workflow token
 permissions read-only; explicit job permissions grant only the needed reads and
 OIDC permission. No write token, PAT, GitHub environment, AWS key, SSH key, OIDC
 subject customization, or paid environment reviewer feature is required.
 
 Restrict repository write/admin access, secret changes, and manual dispatch
-authority. Use protected branches/rulesets and independent reviews where the
-repository plan supports them; do not assume those protections exist for a Free
-private repository. A dispatch by an allowed actor is manual deployment
-authorization, **not independent reviewer approval**. An actor allowlist and CI
+authority. The solo-project branch policy requires pull requests and CI with zero
+required approving reviewers; it does not claim independent review. Verify
+available branch protections under the repository plan. A dispatch by an allowed
+actor is manual deployment authorization, **not independent reviewer approval**. An actor allowlist and CI
 cannot compensate for a malicious trusted main writer or repository administrator.
 
 ## Trust and least privilege
@@ -257,8 +259,9 @@ compression and size limits. No test assumes a role or executes an SSM command.
 
 The corrected live run verified OIDC/STS, restricted SSM, all four scripts, server
 idempotency, HTTP, aligned telemetry checks and secret-based masking. The current
-hosted suite passed all 114 tests without skips. The 225 private operator-wrapper
-checks are separate offline evidence. Live cancellation, timeout and failed
+hosted suite passed 121 Python tests plus one mocked Terraform test with zero
+skips; the historical recovery baseline passed 114 tests. The 225 private
+operator-wrapper checks are separate offline evidence. Live cancellation, timeout and failed
 automatic-recovery scenarios were not deliberately exercised; they remain
 limitations, not implied passing results. No additional live test is authorized
 by this runbook.
@@ -286,13 +289,14 @@ separate operator approval. Require successful CI for the exact current main com
 and separate deployment approval before dispatch. An incomplete configuration fails
 closed before OIDC, without falling back to variables.
 
-Keep the repository private while reviewing the old deployment run logs, downloaded
-copies and artifacts. Preserve needed audit evidence privately with redactions;
-separately authorize deletion of affected GitHub run logs/artifacts before public
-publication. New secret masks do not redact old logs. Exposed resource identifiers
-alone do not warrant infrastructure replacement or access-key rotation. The first
-run's AWS credential fields were masked. No historical runs, logs or artifacts were
-deleted during the approved secret migration and publication.
+Historical logs were audited and the confirmed exposed deployment logs were
+deleted through GitHub's log-only API. All workflow run records, clean logs and
+successful status records were preserved. Redacted evidence and original content
+hashes remain private; do not publish downloaded raw copies. Recheck new logs and
+artifacts before changing visibility. New secret masks do not redact old logs.
+Exposed resource identifiers alone do not warrant infrastructure replacement or
+access-key rotation. The first run's AWS credential fields were masked. Any
+additional deletion requires separate review and authorization.
 
 References for the correction: [CloudWatch query periods and rounding](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_GetMetricStatistics.html),
 [IncomingLogEvents](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch-Logs-Monitoring-CloudWatch-Metrics.html),

@@ -11,14 +11,14 @@ an explicitly approved release.
 repository level. The dedicated role denies federation and its managed policy
 denies service permissions for issued sessions. The delivery implementation and
 its verified historical results are retained; re-enabling it requires a separate
-security review and approved configuration change. The repository remains private
-pending the remaining publication steps.
-The lab instance is stopped during publication preparation; availability and
-telemetry results below describe the completed live tests.
+security review and approved configuration change. This operating mode does not
+depend on repository visibility. The lab instance is stopped; availability and
+telemetry results below describe completed live tests.
 
-The project manages **33 Terraform resources**, has a verified hosted baseline of
-**114 passing tests**, and has verified live deployment, strict configuration
-idempotency, website restoration, and CloudWatch-to-SNS email notification delivery. Live CloudWatch
+The project manages **33 Terraform resources**. Latest verified hosted CI passed
+**121 Python tests plus one mocked Terraform test**, with zero skips. Live
+deployment, strict configuration idempotency, website restoration, and
+CloudWatch-to-SNS email notification delivery were also verified. Live CloudWatch
 Agent restoration recovered monitoring, but did **not** pass complete recovery
 verification. The [testing and recovery record](docs/recovery-testing.md) separates
 these outcomes from isolated simulations and private offline checks.
@@ -31,8 +31,8 @@ these outcomes from isolated simulations and private offline checks.
 [Editable draw.io source](docs/diagrams/architecture.drawio) ·
 [Diagram scope and editing notes](docs/diagrams/README.md)
 
-The diagram's delivery path describes the implemented architecture, currently
-suspended for CI-only publication; it does not authorize deployment.
+The diagram's delivery path describes the implemented architecture, disabled in
+the current CI-only operating mode; it does not authorize deployment.
 
 The lab uses `us-east-2` and a custom `10.20.0.0/16` VPC. Two public and two
 private subnets span `us-east-2a` and `us-east-2b`. The public route table reaches
@@ -174,13 +174,19 @@ event creation time or per-stream freshness.
 
 | Verification | Result and boundary |
 | --- | --- |
-| Published hosted Ubuntu baseline | **114 passed, zero skips:** 81 ordinary tests, 31 isolated recovery cases, two Linux fixture-readiness guards |
+| Latest hosted Ubuntu CI | **121 Python tests passed, zero skips:** 88 ordinary tests, 31 isolated recovery cases, two Linux fixture-readiness guards |
+| Mocked Terraform test | **One run passed:** seven assertions covering federation/session denial, trust sensitivity, role/boundary preservation, and public-IP launch intent; no AWS apply |
+| Historical hosted recovery baseline | **114 passed, zero skips:** 81 ordinary tests, 31 isolated recovery cases, two Linux fixture-readiness guards |
 | Private operator-wrapper review | **225 separate offline checks passed:** 170 server, 31 controller, 24 observer checks; not hosted tests or a live recovery pass |
 | Authenticated delivery | Complete live OIDC/STS, restricted SSM execution, four zero script exits, HTTP checks, fresh metrics/log ingestion, retention, and identifier masking verified |
 | Strict configuration idempotency | Verified on the live server, including unchanged compliant-file ctime and service identities |
 | Live website restoration | Controlled HTML comment added, then existing rollback interface restored exact original content and security metadata; expected inode/timestamp changes recorded; no unnecessary service reload/restart |
 | Live Agent restoration | Monitoring recovered and subsequent health/telemetry checks passed; complete restoration verification remained incomplete and is closed with limitations |
 | Alarm-to-email notification | One labelled simulated `SetAlarmState` transition recorded a successful SNS action; operator confirmed the matching email; alarm returned naturally to evaluated OK |
+
+The [latest verified CI run](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45759551505)
+records these 121 Python tests and the mocked Terraform test for commit
+`f6a5976faaabb401aa06f056b9c06d74b2d3b156`. Historical test counts remain separate.
 
 Isolated recovery cases exercise unchanged production code with disposable Linux
 files, command substitutes, and chroot/network/PID/mount isolation. They cover

@@ -1,10 +1,15 @@
 # Server configuration baseline
 
+The instance is stopped during CI-only publication preparation. Service health
+and package versions below record the verified running baseline, not current
+availability. Publication work does not start or reconfigure the server.
+
 The automation has completed controlled deployment and strict configuration
 idempotency testing on the lab server. Repeated execution preserved file content,
 inodes, timestamps, ownership, permissions, package versions, services, and recovery
-backup inventory. Terraform continues to own all 27 infrastructure
-resources; these scripts own only operating system configuration and website files.
+backup inventory. Terraform owns 33 AWS resource instances, including six delivery
+security resources; these scripts own only operating system configuration and
+website files. See the [resource inventory](../terraform/README.md).
 
 ## Inspected server
 
@@ -28,9 +33,12 @@ security response headers were observed. The managed drop-in preserves only
 `server_tokens off;` and leaves the package-owned main configuration intact.
 
 The current homepage retains its dark colors, responsive card grid, and inline
-CSS. Wording now states that CloudWatch and Terraform integration are complete,
-while CI/CD is planned. No CSS framework, JavaScript runtime, build tools, or
-external web assets are required.
+CSS. Its pinned release states that CloudWatch and Terraform integration are
+complete and retains the earlier wording that CI/CD is planned. Authenticated
+delivery has since passed end-to-end verification; this homepage copy is an
+approved release snapshot, not the current implementation-status reference.
+Changing it requires new release-hash approval. No CSS framework, JavaScript
+runtime, build tools, or external web assets are required.
 
 ## Files and ownership
 
@@ -116,8 +124,13 @@ Local Bash syntax, JSON/HTML checks, source inspections, LF checks, and help-onl
 execution do not prove Linux deployment behavior. Controlled server tests verified
 Nginx configuration integration, Agent translation/schema checks, local/public HTTP,
 service health, fresh metrics/log delivery, and strict repeat-run idempotency.
-Deliberate failure injection and formal rollback/recovery testing remain pending;
-the documented recovery paths are not a claim of completed recovery testing.
+The hosted Linux harness passed 31 isolated recovery cases and two readiness
+guards within 114 total tests. Live website restoration passed; Agent restoration
+recovered healthy monitoring but did not complete its full verification and is
+closed with limitations. The [testing record](recovery-testing.md) documents these
+boundaries and the 225 separate private offline checks. An Agent activation may
+regenerate cached/generated files or update metadata even with unchanged content;
+that differs from a compliant no-op deployment, which must avoid activation.
 Agent commands follow the installed toolchain and may make metadata/network reads.
 
 References: [CloudWatch Agent configuration](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html),

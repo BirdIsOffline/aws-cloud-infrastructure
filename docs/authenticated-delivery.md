@@ -1,15 +1,31 @@
 # Restricted authenticated delivery infrastructure
 
+## Current operating mode
+
+Delivery is suspended for CI-only publication. Both GitHub CD workflows are
+disabled. The dedicated deployment trust has an unconditional federation deny
+and no allow; the existing attached deployment policy also denies all actions
+and resources, covering previously issued sessions after IAM propagation. The
+permissions boundary, OIDC provider, instance role and pinned executor are
+unchanged. Previous approved policies are preserved in protected local evidence.
+The implementation below records the verified design; its former trust conditions
+are historical, not the active authorization policy. Re-enabling access requires
+a separately reviewed configuration change, not a workflow re-run or variable.
+All capability descriptions below refer to the retained permission ceiling and
+previously verified design; the current deny overrides its service-access grants.
+
 ## Status and trust model
 
 Six Terraform security resources were separately provisioned from the approved
 saved plan and verified live. State now retains 33 managed resources and four data
-sources, with a refreshed zero-change plan. The first published manual run proved
-OIDC, restricted SSM execution and server idempotency, but its telemetry gate failed.
-Freshness and secret-masking corrections are implemented and the eight repository
-secrets are configured; a separately approved controlled live retest remains pending.
+sources; the post-provisioning refreshed plan showed zero changes before this
+publication suspension. A controlled manual deployment passed
+exact-commit authorization, OIDC/STS, restricted SSM execution, all four scripts,
+strict idempotency, HTTP, fresh telemetry, retention and runtime masking checks.
+The first run's telemetry failure was corrected before that successful run;
+historical results remain preserved. Eight repository Actions secrets are configured.
 The [manual delivery runbook](manual-deployment.md) covers workflow
-authorization, required variables and remaining live tests. Terraform 1.17.2 and
+authorization, required secrets and operational limits. Terraform 1.17.2 and
 the locked AWS provider 6.74.0 remain unchanged.
 
 | Resource address | Purpose |
@@ -35,14 +51,14 @@ set of one to five explicitly approved `actor_ids`. There are no real IDs or
 permissive defaults in source. The variable is sensitive to redact Terraform UI
 output; resulting trust-policy values will still exist in private Terraform state.
 
-The trust policy uses `StringEquals` for all of:
+Before suspension, the approved trust used `StringEquals` for all of:
 
 - Audience `sts.amazonaws.com`.
 - The exact immutable-ID subject for this repository's `main` branch.
 - Immutable `repository_owner_id`, `repository_id`, and allowed `actor_id` values.
 - `ref` equal to `refs/heads/main`.
 - Caller workflow name `Deploy lab server`.
-- `job_workflow_ref` equal to the future reusable executor workflow path
+- `job_workflow_ref` equal to the reusable executor workflow path
   `BirdIsOffline/aws-cloud-infrastructure/.github/workflows/deploy-server-executor.yml@refs/heads/main`.
 
 Subject IDs are assembled from the external inputs. No wildcard subject,
@@ -58,13 +74,13 @@ No environment claim is required. The design works without private environment
 reviewer gates or a paid plan upgrade. Main access and dispatch authorization
 remain security-critical: private branch protections cannot be assumed on Free,
 and a manual dispatch is not independent two-person approval. Actor restrictions
-also require careful treatment of re-runs: the future workflow must check the
-initiating/re-running actor instead of assuming a re-run represents fresh approval.
+also require careful treatment of re-runs: the implemented gate rejects them
+instead of assuming a re-run represents fresh approval.
 
-The role maximum session is one hour; the future authentication step should request
-a 30-minute session and use full-SHA action pins. Only the deployment job should
-receive `id-token: write`. Validate the actual required claims during an approved
-authentication test without logging JWTs. This step did not request any token.
+The role maximum session is one hour; the credential action requests a 30-minute
+session and uses a full-SHA pin. Only the reusable caller job and deployment job
+receive `id-token: write`. The authorization job and CI do not. Successful live
+role assumption verified compatibility with this trust policy without logging JWTs.
 
 ## Permissions and boundary review
 
@@ -78,7 +94,7 @@ metrics, retention, and stream metadata in `us-east-2`. It cannot list command
 history or retrieve visitor log events. Necessary describe/poll/metric APIs have
 wildcard resources because not all support resource-level restrictions; their
 regional action list is explicit. `DescribeLogStreams` is scoped to the two lab
-log groups. The instance must be verified running and SSM-online by future CD;
+log groups. Delivery verifies that the instance is running and SSM-online;
 this role cannot start it.
 
 The boundary independently denies actions outside the fixed API ceiling, sending
@@ -92,8 +108,9 @@ Only the separate infrastructure operator may change trust, policies, boundary,
 or executor. The boundary does not sandbox root or restrict the existing EC2
 instance role: trusted OS binaries, package repositories, system services, and
 root-controlled host configuration remain part of the trusted computing base.
-The account's SCPs, IAM effective evaluation, service validation, and real token
-exchange have not been tested by local Terraform validation.
+Local Terraform validation cannot prove account-level effective authorization.
+Live token exchange and the permitted deployment path succeeded; that success
+is not exhaustive proof of every deny condition or every possible account policy.
 
 ## Bundle authorization and provenance
 
@@ -113,7 +130,7 @@ an audit label with strict syntax, not proof of CI success. All actual bytes are
 authorized by the independent pinned hashes; changing a commit label cannot
 authorize different bytes. `approved_from_commit` records the revision used to
 review the initial pins, not a self-referential requirement that a manifest contain
-its own Git commit hash. Future CD must independently verify successful CI for
+its own Git commit hash. Delivery independently verifies successful CI for
 the exact source commit, its main-branch provenance, and matching executor pins
 before acquiring credentials. No GitHub token is transferred to EC2.
 
@@ -123,9 +140,9 @@ python3 -B -m unittest discover -s tests -p 'test_ssm_executor.py'
 ```
 
 The packer checks, rather than silently accepting, a source/contract mismatch.
-To generate parameter data later, an operator may use its `--output` argument
+To generate reviewed parameter data, an operator may use its `--output` argument
 with a fresh file under `.local`. OperationId must be supplied separately from the
-future workflow run/attempt identifier. Do not print the payload in Actions logs.
+workflow run/attempt identifier. Do not print the payload in Actions logs.
 
 ## Document and execution limits
 
@@ -143,14 +160,14 @@ Limits are fixed in the immutable contract:
   declarations are rejected.
 - The rendered document plus the maximum encoded parameter and 1 KiB overhead
   must fit a conservative 60 KiB budget, below the 64 KiB document quota. This
-  check runs locally and is a Terraform precondition. It is not a claim that
-  AWS has accepted a live SendCommand request; that remains a rollout check.
+  check runs locally and is a Terraform precondition. Service acceptance was
+  separately verified by the controlled live deployment, not by size checks alone.
 - The SSM plugin timeout is 900 seconds. Subprocesses share a 600-second initial
   budget; recovery gets up to 180 seconds, leaving headroom. OS hangs or hard
   termination can still require manual recovery.
 
-Future CD must set a short SendCommand delivery timeout (120 seconds), target one
-explicit instance, and refuse stopped/offline targets. That delivery timeout is
+Delivery sets a short SendCommand delivery timeout (120 seconds), targets one
+explicit instance, and refuses stopped/offline targets. That delivery timeout is
 separate from plugin execution time. Already accepted commands can outlive their
 submitting job/session; revoking trust or cancelling GitHub does not by itself
 prove a queued/running command has stopped. Pending-command cancellation and
@@ -190,7 +207,7 @@ verification. Postchecks require active/enabled services, healthy Agent, exact l
 HTTP content, HTTP 404 for the former backup URL, matching cached configuration,
 correct managed-file metadata, and an unchanged package-owned main Nginx config.
 Public HTTP, fresh AWS telemetry and seven-day retention remain mandatory checks
-for the future orchestrator using the read-only permissions provided here.
+performed by the implemented orchestrator using the read-only permissions here.
 
 On failure after deployment starts, the coordinator attempts monitoring then website
 recovery through the pinned rollback interfaces, restores the original presence of
@@ -224,29 +241,33 @@ do not create unreviewed versions under an authorized document name.
 1. Review any new source/configuration and predecessor baseline. Recompute hashes
    from reviewed bytes; never copy arbitrary caller-supplied digests into the contract.
 2. Run local validation/tests and review the complete content-addressed document.
-3. Separately approve an infrastructure plan. Initial intended changes are exactly
-   six additions with no changes to the existing 27 resources. The stopped-instance
-   public-IP observation can still trigger the previously documented EC2 parity
-   caveat: report it, preserve prevent_destroy, and do not start/replace the instance
-   or edit state to force a clean plan.
-4. Before first apply, supply private identity inputs, confirm issuer ownership,
-   and review all IAM and SSM changes. No apply is authorized by this document.
+3. Separately review a complete infrastructure plan using the matching private
+   state and identity inputs. Initial provisioning is complete; do not recreate
+   the six resources. The documented single-attribute public-IP lifecycle exception
+   addresses the stopped-instance observation while preserving launch intent.
+   Review every other change normally; preserve prevent_destroy and investigate
+   discrepancies rather than replacing the instance or editing state.
+4. Confirm issuer ownership and review all IAM/SSM effects and private saved-plan
+   integrity before separately approving any apply. No apply is authorized here.
 5. For a later executor replacement, prevent_destroy intentionally blocks replacing
    the resource at the same address. Use a separately reviewed parallel versioned
    resource/address and policy cutover, then separately authorize retirement of the
    old version. Do not weaken guards to bypass the review.
-6. The exact manual caller/reusable pair is now implemented locally. Publish and
-   test it only with separate approval. The required job_workflow_ref claim cannot
+6. The manual caller/reusable pair is published and live-verified. Future changes
+   and executions require separate approval. The required job_workflow_ref claim cannot
    be tested from a standalone job. This caller deploys after its gates; a separate
    reviewed non-deploying path is required for an authentication-only live test.
-   Separately approve formal recovery tests and instance readiness before command
-   execution. Keep the constant GitHub concurrency group with cancel-in-progress
+   Review the recorded recovery limitations and verify instance readiness before
+   command execution. Keep the constant GitHub concurrency group with cancel-in-progress
    disabled, in addition to the server lock.
 
-Local tests prove decoder/input behavior, not live IAM enforcement, SSM service
-acceptance, Linux service activation, delivery, or rollback. POSIX ownership/link
-tests cannot execute on native Windows and are reported as skipped there. Existing
-infrastructure definitions and state remain unchanged during workflow implementation.
+Local tests prove decoder/input behavior, not live IAM enforcement or service
+activation. Hosted Linux CI passed all 114 tests without skips, including POSIX
+checks and isolated recovery. Live delivery and website restoration also passed;
+complete live Agent recovery verification did not. The
+[testing record](recovery-testing.md) owns the evidence and boundaries, including
+the 225 separate private offline checks. Native Windows cannot execute the Linux
+isolation cases and reports that limitation explicitly.
 
 References: [AWS GitHub condition keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_iam-condition-keys.html),
 [GitHub immutable subjects](https://docs.github.com/en/actions/reference/security/oidc),

@@ -47,10 +47,10 @@ resource "aws_instance" "web" {
   monitoring                           = false
   hibernation                          = false
 
-  # Public IPv4 assignment preserves the original enabled launch setting.
-  # Verify with normal refresh while running; provider 6.74.0 marks it ForceNew.
-  # See README.md for the stopped-instance caveat. Never remove prevent_destroy
-  # to bypass an unexpected replacement proposal.
+  # The true launch setting above is deliberate. Provider 6.74.0 reads the
+  # current interface association, which is absent while stopped, as false.
+  # The lifecycle exception below applies only to this lossy observation.
+  # See README.md for the separate running-instance/public-IP drift checks.
 
   # No user data, provisioners, or instance-state resource during adoption.
   # Nginx, website files, and the CloudWatch Agent remain separately managed.
@@ -90,5 +90,7 @@ resource "aws_instance" "web" {
 
   lifecycle {
     prevent_destroy = true
+    # Still used on creation; existing-instance changes need operator review.
+    ignore_changes = [associate_public_ip_address]
   }
 }

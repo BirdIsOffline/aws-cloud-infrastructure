@@ -1,5 +1,5 @@
 variable "github_deployment_identity" {
-  description = "Externally supplied immutable GitHub identifiers; never place real values in public source."
+  description = "Historical immutable GitHub identity inputs retained for review; they do not enable suspended deployment. Never place real values in public source."
   type = object({
     owner_id      = string
     repository_id = string

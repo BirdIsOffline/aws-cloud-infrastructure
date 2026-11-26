@@ -1,9 +1,4 @@
 locals {
-  cd_repository = "BirdIsOffline/aws-cloud-infrastructure"
-  cd_subject = format(
-    "repo:BirdIsOffline@%s/aws-cloud-infrastructure@%s:ref:refs/heads/main",
-    var.github_deployment_identity.owner_id, var.github_deployment_identity.repository_id
-  )
   cd_region_condition = { StringEquals = { "aws:RequestedRegion" = var.aws_region } }
   cd_permissions = {
     Version = "2012-10-17"
@@ -75,33 +70,35 @@ resource "aws_iam_role" "github_deploy" {
   description          = "Restricted manually authorized GitHub lab server deployment"
   max_session_duration = 3600
   permissions_boundary = aws_iam_policy.github_deploy_boundary.arn
-  assume_role_policy = jsonencode({
+  # Retain the existing sensitivity classification without changing policy JSON.
+  assume_role_policy = sensitive(jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect    = "Allow"
+      # CI-only publication: no principal receives deployment federation access.
+      # The former approved trust is preserved in protected operator evidence.
+      Sid       = "SuspendDeploymentFederationForCIPublication"
+      Effect    = "Deny"
       Principal = { Federated = aws_iam_openid_connect_provider.github.arn }
       Action    = "sts:AssumeRoleWithWebIdentity"
-      Condition = {
-        StringEquals = {
-          "token.actions.githubusercontent.com:aud"                 = "sts.amazonaws.com"
-          "token.actions.githubusercontent.com:sub"                 = local.cd_subject
-          "token.actions.githubusercontent.com:repository_owner_id" = var.github_deployment_identity.owner_id
-          "token.actions.githubusercontent.com:repository_id"       = var.github_deployment_identity.repository_id
-          "token.actions.githubusercontent.com:actor_id"            = sort(tolist(var.github_deployment_identity.actor_ids))
-          "token.actions.githubusercontent.com:ref"                 = "refs/heads/main"
-          "token.actions.githubusercontent.com:workflow"            = "Deploy lab server"
-          "token.actions.githubusercontent.com:job_workflow_ref"    = "${local.cd_repository}/.github/workflows/deploy-server-executor.yml@refs/heads/main"
-        }
-      }
     }]
-  })
+  }))
   lifecycle { prevent_destroy = true }
 }
 
 resource "aws_iam_policy" "github_deploy" {
   name        = "aws-lab-github-deploy"
   description = "Invoke one reviewed document on the existing lab instance and inspect results"
-  policy      = jsonencode(local.cd_permissions)
+  # Trust suspension alone does not remove permissions from issued sessions.
+  # This existing policy is attached only to the dedicated deployment role.
+  policy = jsonencode({
+    Version = local.cd_permissions.Version
+    Statement = concat(local.cd_permissions.Statement, [{
+      Sid      = "BlockDeploymentSessionsForCIPublication"
+      Effect   = "Deny"
+      Action   = "*"
+      Resource = "*"
+    }])
+  })
 }
 
 resource "aws_iam_role_policy_attachment" "github_deploy" {

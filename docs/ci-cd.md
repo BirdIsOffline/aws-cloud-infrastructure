@@ -1,5 +1,10 @@
 # Continuous integration and manual delivery
 
+The current operating mode is **CI only**: CI is active, both delivery workflows
+are disabled in GitHub, and the dedicated AWS role has federation and session
+permission denies. The authenticated delivery sections describe the retained,
+previously verified implementation. No deployment is authorized by this guide.
+
 ## Isolated recovery validation
 
 The source job also runs the offline Linux recovery harness through the existing
@@ -9,23 +14,28 @@ host mounts. Missing Linux isolation support fails CI. Thirteen additional porta
 guard tests run with the existing regression suite. See
 [the recovery test guide](recovery-testing.md) for prerequisites, safety boundaries,
 expected exit codes, and the distinction between simulated and live recovery.
-The first hosted run exposed missing temporary-directory initialization; the
-corrected fixture requires a new hosted run. See the recovery guide for acceptance.
+The published recovery baseline passed all 114 tests with zero skips: 81 ordinary tests,
+31 recovery cases and two Linux readiness guards. See the recovery guide for
+recorded results and limits; the separate 225 private offline checks are not
+part of this CI count.
 
 ## Current scope
 
 `.github/workflows/ci.yml` validates public source only. It runs on pushes to
 `main`, pull requests targeting `main`, and manual workflow dispatch. Both jobs
 use GitHub-hosted `ubuntu-24.04` runners. The workflow grants only `contents: read`,
-does not persist checkout credentials, and has no AWS credentials, OIDC permission,
-environment secrets, deployment commands, or infrastructure deployment step.
+does not persist checkout credentials, and references no AWS credentials, OIDC
+permission, deployment secrets, live deployment commands, or infrastructure
+deployment step. The recovery harness executes production scripts only against
+its isolated substitutes and disposable filesystem.
 
 Concurrent runs for the same ref cancel superseded CI work. Source validation has
 a ten-minute timeout; Terraform validation has twenty minutes. Every failed check
 fails its job. Terraform runs only after the source checks pass. There are no path
 filters that could skip checks while reporting a successful required workflow.
 
-Hosted CI passed after the reviewed Windows/Linux provider checksum correction.
+Hosted CI passed after the reviewed Windows/Linux provider checksum correction
+and again with the complete isolated recovery suite.
 Server automation previously passed strict live configuration idempotency;
 these CI checks do not execute it against any server or repeat that live test.
 
@@ -54,9 +64,10 @@ The reusable entry point runs:
 - `bash -n` and ShellCheck at all default severities for all four server scripts
   and the CI shell entry point. Missing tools fail rather than silently skip.
 - The restricted executor bundle/size checks and local positive/negative unit
-  tests, including protections for all seven pinned files. These do not execute
-  the privileged deployment entry point. Native Windows skips real POSIX metadata
-  tests; those execute on a Linux CI runner after publication.
+  tests, including protections for all seven pinned files. They do not perform
+  privileged deployment on the host; the recovery runner separately executes
+  production code inside isolation. Native Windows skips real POSIX metadata
+  tests; those executed successfully on the hosted Linux runner.
 
 Ubuntu runner images provide Bash, Python 3, Git, and ShellCheck. Their installed
 versions can change with image updates; no package installation or upgrade is part
@@ -76,6 +87,7 @@ cd terraform
 terraform fmt -check -recursive
 terraform init -backend=false -input=false -lockfile=readonly
 terraform validate
+terraform test
 ```
 
 Initialization needs public Terraform registry/release network access. It installs
@@ -85,12 +97,21 @@ or KMS lookups. It cannot establish live parity, cost, least privilege, server
 health, or drift. No state, saved plan, or Terraform directory is uploaded as an
 artifact or cached by this workflow.
 
+The Terraform test uses a fully mocked AWS provider and disposable in-memory
+test state. It checks deny-only federation, the existing-session permissions deny,
+the retained boundary and EC2 service role, trust-policy sensitivity, and the
+explicit public-IP creation setting. It does not apply against AWS or use the
+adopted state. Seven additional Python contract tests restrict the lifecycle
+exception to that one attribute and preserve destruction protection. These
+publication checks extend the recorded 114-test baseline; see the exact revision's
+Actions results for their hosted outcome.
+
 The existing lock includes release archive checksums for multiple platforms. Local
 compatibility verification uses an isolated configuration copy, clean initialization,
 and Terraform's Linux AMD64 provider mirror download, comparing the archive against
 the unchanged lock and HashiCorp's release checksum manifest. Hosted Ubuntu CI
-subsequently passed initialization and validation. New workflow/helper changes
-still require a successful hosted run after separately approved publication.
+subsequently passed initialization and validation. Any future workflow/helper
+change still requires a successful hosted run after reviewed publication.
 
 ## Repository hygiene and action pins
 
@@ -130,11 +151,15 @@ actionlint where available; no unpinned lint action is introduced.
 ## Authenticated manual delivery
 
 The six restricted IAM/OIDC/SSM resources were separately provisioned and verified.
-Terraform now retains parity across 33 managed resources and four data sources.
+A post-provisioning plan verified parity across 33 managed resources and four
+data sources before the publication cutoff.
 The first published caller/reusable run passed authorization, OIDC, SSM execution
-and all four scripts but failed its telemetry gate. Corrections use aligned minute
-queries, IncomingLogEvents and pre-registered Actions secrets. The eight secrets are
-configured and superseded variables removed; a controlled retest remains pending.
+and all four scripts but failed its telemetry gate. After correcting aligned-minute
+queries and IncomingLogEvents checks and migrating inputs to pre-registered Actions
+secrets, the controlled live deployment passed every end-to-end verification.
+The eight secrets are configured and superseded variables removed. See the
+[testing record](recovery-testing.md) for the distinction between this success,
+live recovery outcomes and offline simulations.
 See the
 [authenticated delivery security model](authenticated-delivery.md) for resource
 addresses, external identity inputs, supported trust claims, permission boundary,
@@ -153,14 +178,14 @@ instance/document, server-side locking, and no SSH, permanent AWS keys, new
 artifact-storage service, or automatic Terraform deployment. A constant concurrency
 group prevents automatic cancellation of running deployments. The helper verifies
 public HTTP, fresh telemetry, and seven-day log retention after server success.
-Publishing, authenticating or executing these workflows requires separate approval.
+Future publication, authentication or execution requires separate approval.
 The CI entry point now runs all `test_*.py` suites, including synthetic CD gating,
 input, private staging and polling tests. No test makes live deployment calls.
 
-See the [manual delivery runbook](manual-deployment.md) for migration from seven
-variables to eight repository secrets, including the role unique ID masking input,
-all eight unchanged trust conditions, telemetry evidence limits, pinned release
-procedure, failure handling and remaining acceptance tests. Repository privacy and
+See the [manual delivery runbook](manual-deployment.md) for the eight repository
+secrets, including the role unique ID masking input, all eight trust conditions,
+telemetry evidence limits, pinned release procedure, failure handling and live-test
+boundaries. Repository privacy and
 read-only default token permissions were preserved during the approved migration.
 
 References: [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use),

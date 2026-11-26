@@ -1,20 +1,32 @@
 # Manual GitHub Actions delivery
 
+## Suspension for CI-only publication
+
+Both delivery workflows are disabled at repository level, and AWS denies new
+federation and service permissions for the dedicated deployment role's sessions.
+CI remains enabled. Do not dispatch or re-run delivery. The procedures below
+document the retained implementation and its historical verification; they are
+not a reactivation procedure. A future public-delivery design and any restoration
+of permissions require separate approval and regression testing.
+
 ## Implementation status
 
 The caller, reusable executor, and local synthetic tests are implemented. The six
 OIDC/IAM/SSM security resources were separately provisioned and verified, bringing
-Terraform to 33 managed resources and four data sources with a zero-change plan.
-The first published run passed authorization, OIDC, restricted SSM execution, all
-four scripts and server checks, but failed automated telemetry freshness checks.
-Read-only follow-up confirmed idempotency and fresh telemetry. The corrections
-described here require a separately approved controlled live retest. Formal
-failure injection and recovery testing remain pending.
+Terraform to 33 managed resources and four data sources with a post-provisioning
+zero-change plan before the publication suspension.
+The corrected controlled live deployment passed exact-commit authorization,
+OIDC/STS, one restricted SSM execution, four zero script exits, strict idempotency,
+HTTP, fresh telemetry, retention and runtime masking checks. The earlier run's
+telemetry-verification failure remains recorded. Hosted CI subsequently passed
+114 tests with zero skips, including isolated recovery. See the
+[testing record](recovery-testing.md) for live website restoration, confirmed
+simulated alarm-to-email delivery and the closed Agent-verification limitations.
 
 ## Authorization and execution
 
 `.github/workflows/deploy-server.yml` is named **Deploy lab server**, exactly as
-required by the role trust policy. Its only trigger is `workflow_dispatch` and its
+required by the former deployment trust policy. Its only trigger is `workflow_dispatch` and its
 only input is a full lowercase 40-character `commit` SHA. Select the `main` branch
 and the exact current main revision when dispatching. No branch/tag shorthand is
 accepted as the commit input.
@@ -63,8 +75,8 @@ variable fallback are used; reusable secrets are passed explicitly, without
 
 | Repository secret | Required value |
 | --- | --- |
-| `CD_GITHUB_OWNER_ID` | Immutable owner ID from the approved live trust policy |
-| `CD_GITHUB_REPOSITORY_ID` | Immutable repository ID from that policy |
+| `CD_GITHUB_OWNER_ID` | Reviewed immutable owner ID from the historical deployment contract |
+| `CD_GITHUB_REPOSITORY_ID` | Reviewed immutable repository ID from that contract |
 | `CD_ALLOWED_ACTOR_IDS` | JSON array of numeric strings; exactly the approved actor list, one to five entries |
 | `CD_ROLE_ARN` | Provisioned `aws-lab-github-deploy-role` ARN |
 | `CD_ROLE_UNIQUE_ID` | Existing role's `RoleId`, available as private Terraform `unique_id` or through an approved operator GetRole query |
@@ -76,13 +88,14 @@ The document name is derived from the complete pinned executor content. Its
 version is fixed at `1`; neither arbitrary document names nor commands are workflow
 inputs. The configured AWS hash must also equal the locally rendered document hash.
 
-Enable Actions for the repository and allow the pinned official `actions/checkout`
-and `aws-actions/configure-aws-credentials` actions. Keep default workflow token
+The verified deployment setup used repository Actions with the pinned official
+`actions/checkout` and `aws-actions/configure-aws-credentials` actions. During
+CI-only publication, leave both delivery workflows disabled. Keep default workflow token
 permissions read-only; explicit job permissions grant only the needed reads and
 OIDC permission. No write token, PAT, GitHub environment, AWS key, SSH key, OIDC
 subject customization, or paid environment reviewer feature is required.
 
-Restrict repository write/admin access, variable changes, and manual dispatch
+Restrict repository write/admin access, secret changes, and manual dispatch
 authority. Use protected branches/rulesets and independent reviews where the
 repository plan supports them; do not assume those protections exist for a Free
 private repository. A dispatch by an allowed actor is manual deployment
@@ -91,7 +104,8 @@ cannot compensate for a malicious trusted main writer or repository administrato
 
 ## Trust and least privilege
 
-The workflow structure preserves all eight live `StringEquals` conditions:
+Before suspension, the workflow matched these eight approved `StringEquals`
+conditions. The current live trust is deny-only:
 
 | Claim | Workflow behavior |
 | --- | --- |
@@ -204,7 +218,10 @@ failure latch. A timeout or hard termination requires operator checks for active
 children, server lock, operation record, backups and baseline service health.
 Only a separately authorized operator may clear the latch after verified recovery.
 Do not re-run the job or create a fresh dispatch as a workaround for a failed run.
-Formal failure injection and recovery remain separately approved, unperformed tests.
+Isolated Linux tests cover failure, timeout, latch and recovery branches. Their
+success does not establish live interruption/cancellation recovery. Live website
+restoration passed; complete Agent restoration verification did not. Future
+operator recovery requires separate approval and the safeguards above.
 
 ## Release revision procedure
 
@@ -229,7 +246,7 @@ to SendCommand after all gates pass. An authentication-only live test therefore
 requires a separately reviewed non-deploying path before any dispatch. Do not use
 an intentional failure or revoked permission as a substitute for that path.
 
-## Local checks and remaining acceptance
+## Local checks and live verification boundaries
 
 Run `bash scripts/ci/validate.sh` and `actionlint` from the project root. The CI
 entry point discovers both executor and delivery test suites. Synthetic tests cover
@@ -238,10 +255,13 @@ staging, single submission, eventual consistency, terminal failures and polling
 deadlines. Existing bundle tests exercise altered files, traversal, links, malformed
 compression and size limits. No test assumes a role or executes an SSM command.
 
-The first run proved live OIDC/STS and SSM execution, script success and server
-idempotency. The corrected verification and secret-based masking require hosted CI
-and a separately approved live run. Cancellation and recovery tests remain pending.
-Schedule each live test through separate approval.
+The corrected live run verified OIDC/STS, restricted SSM, all four scripts, server
+idempotency, HTTP, aligned telemetry checks and secret-based masking. The current
+hosted suite passed all 114 tests without skips. The 225 private operator-wrapper
+checks are separate offline evidence. Live cancellation, timeout and failed
+automatic-recovery scenarios were not deliberately exercised; they remain
+limitations, not implied passing results. No additional live test is authorized
+by this runbook.
 
 ## Logging migration and previous exposure
 

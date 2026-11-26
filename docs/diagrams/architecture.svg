@@ -1,0 +1,419 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="2230" viewBox="0 0 1200 2230" role="img" aria-labelledby="diagram-title diagram-description">
+  <title id="diagram-title">AWS lab architecture: regional workload, restricted delivery and infrastructure management</title>
+  <desc id="diagram-description">One EC2 Nginx workload in a custom us-east-2 VPC with four subnets across two Availability Zones. Public HTTP, encrypted EBS, CloudWatch metrics and logs, dashboard, CPU alarm and SNS email. Manual GitHub delivery uses exact-commit CI authorization, OIDC and STS, a bounded IAM role and restricted SSM executor. Terraform manages infrastructure separately. Three subnets are unused; no application failover, load balancer or NAT gateway.</desc>
+  <defs>
+    <marker id="arrow-public" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#087F70" />
+    </marker>
+    <marker id="arrow-delivery" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563EB" />
+    </marker>
+    <marker id="arrow-monitor" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#A76104" />
+    </marker>
+    <marker id="arrow-infra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7056A7" />
+    </marker>
+    <marker id="arrow-assoc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#728093" />
+    </marker>
+    <symbol id="icon-ec2" viewBox="0 0 80 80">
+      <g id="ec2-Icon-Architecture/64/Arch_Amazon-EC2_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="ec2-Icon-Architecture-BG/64/Compute" fill="#ED7100">
+          <rect id="ec2-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M27,53 L52,53 L52,28 L27,28 L27,53 Z M54,28 L58,28 L58,30 L54,30 L54,34 L58,34 L58,36 L54,36 L54,39 L58,39 L58,41 L54,41 L54,45 L58,45 L58,47 L54,47 L54,51 L58,51 L58,53 L54,53 L54,53.136 C54,54.164 53.164,55 52.136,55 L52,55 L52,59 L50,59 L50,55 L46,55 L46,59 L44,59 L44,55 L41,55 L41,59 L39,59 L39,55 L35,55 L35,59 L33,59 L33,55 L29,55 L29,59 L27,59 L27,55 L26.864,55 C25.836,55 25,54.164 25,53.136 L25,53 L22,53 L22,51 L25,51 L25,47 L22,47 L22,45 L25,45 L25,41 L22,41 L22,39 L25,39 L25,36 L22,36 L22,34 L25,34 L25,30 L22,30 L22,28 L25,28 L25,27.864 C25,26.836 25.836,26 26.864,26 L27,26 L27,22 L29,22 L29,26 L33,26 L33,22 L35,22 L35,26 L39,26 L39,22 L41,22 L41,26 L44,26 L44,22 L46,22 L46,26 L50,26 L50,22 L52,22 L52,26 L52.136,26 C53.164,26 54,26.836 54,27.864 L54,28 Z M41,65.876 C41,65.944 40.944,66 40.876,66 L14.124,66 C14.056,66 14,65.944 14,65.876 L14,39.124 C14,39.056 14.056,39 14.124,39 L20,39 L20,37 L14.124,37 C12.953,37 12,37.953 12,39.124 L12,65.876 C12,67.047 12.953,68 14.124,68 L40.876,68 C42.047,68 43,67.047 43,65.876 L43,61 L41,61 L41,65.876 Z M68,14.124 L68,40.876 C68,42.047 67.047,43 65.876,43 L60,43 L60,41 L65.876,41 C65.944,41 66,40.944 66,40.876 L66,14.124 C66,14.056 65.944,14 65.876,14 L39.124,14 C39.056,14 39,14.056 39,14.124 L39,20 L37,20 L37,14.124 C37,12.953 37.953,12 39.124,12 L65.876,12 C67.047,12 68,12.953 68,14.124 L68,14.124 Z" id="ec2-Amazon-EC2_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-ebs" viewBox="0 0 80 80">
+      <g id="ebs-Icon-Architecture/64/Arch_Amazon-Elastic-Block-Store_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="ebs-Icon-Architecture-BG/64/Storage" fill="#7AA116">
+          <rect id="ebs-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M66,58 L68,58 L68,68 L58,68 L58,66 L64.586,66 L56.293,57.707 L57.707,56.293 L66,64.586 L66,58 Z M23.707,57.707 L15.414,66 L22,66 L22,68 L12,68 L12,58 L14,58 L14,64.586 L22.293,56.293 L23.707,57.707 Z M68,12 L68,22 L66,22 L66,15.414 L57.707,23.707 L56.293,22.293 L64.586,14 L58,14 L58,12 L68,12 Z M15.414,14 L23.707,22.293 L22.293,23.707 L14,15.414 L14,22 L12,22 L12,12 L22,12 L22,14 L15.414,14 Z M50.678,53.661 C49.521,54.848 45.635,56.046 39.563,56.046 C32.168,56.046 28.031,54.23 28,53 L28,29.857 C30.603,31.395 35.32,32 39.563,32 C43.756,32 48.418,31.397 51,29.867 L51,53.025 C51.002,53.099 51.008,53.323 50.678,53.661 L50.678,53.661 Z M39.563,24 C45.663,24 49.545,25.181 50.686,26.352 C51.008,26.682 51.002,26.902 51,26.975 L51,27 C51,28.226 46.927,30 39.563,30 C32.422,30 28.032,28.265 28.003,27.013 C28.061,25.746 32.093,24 39.563,24 L39.563,24 Z M52.999,27 C53.007,26.482 52.858,25.716 52.118,24.956 C50.313,23.105 45.62,22 39.563,22 C33.365,22 26.094,23.303 26,27 L26,53.025 C26.095,56.731 33.365,58.046 39.563,58.046 C44.22,58.046 49.962,57.261 52.11,55.057 C52.869,54.278 53.013,53.495 53,53 L53,27.011 L53,27.004 L53,27 L52.999,27 Z" id="ebs-Amazon-Elastic-Block-Store_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-cw" viewBox="0 0 80 80">
+      <g id="cw-Icon-Architecture/64/Arch_Amazon-CloudWatch_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="cw-Icon-Architecture-BG/64/Management-Governance" fill="#E7157B">
+          <rect id="cw-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M55.0592315,46.7773707 C55.0592315,42.8680281 51.8575588,39.6876305 47.9220646,39.6876305 C43.9865705,39.6876305 40.785903,42.8680281 40.785903,46.7773707 C40.785903,50.6867133 43.9865705,53.8671108 47.9220646,53.8671108 C51.8575588,53.8671108 55.0592315,50.6867133 55.0592315,46.7773707 M57.0697011,46.7773707 C57.0697011,51.7881194 52.9663327,55.8642207 47.9220646,55.8642207 C42.8788018,55.8642207 38.7754334,51.7881194 38.7754334,46.7773707 C38.7754334,41.7666219 42.8788018,37.6905206 47.9220646,37.6905206 C52.9663327,37.6905206 57.0697011,41.7666219 57.0697011,46.7773707 M65.5096522,60.4735504 L58.5011554,54.2026253 C57.9352082,54.9944794 57.2808004,55.7174332 56.5540156,56.3634982 L63.5524601,62.6334248 C64.1495696,63.1686502 65.0784065,63.1187225 65.6182176,62.5255808 C66.155013,61.9324392 66.1067617,61.010773 65.5096522,60.4735504 M47.9220646,57.6616197 C53.9645309,57.6616197 58.8801289,52.7786859 58.8801289,46.7773707 C58.8801289,40.7750569 53.9645309,35.8931217 47.9220646,35.8931217 C41.8806036,35.8931217 36.9650056,40.7750569 36.9650056,46.7773707 C36.9650056,52.7786859 41.8806036,57.6616197 47.9220646,57.6616197 M67.1119965,63.8626459 C66.4264264,64.6165549 65.47849,65 64.5285431,65 C63.7002296,65 62.8699057,64.708422 62.207456,64.1172774 L54.9305615,57.5987107 C52.9070239,58.8968321 50.505518,59.6587296 47.9220646,59.6587296 C40.7718297,59.6587296 34.9545361,53.8800921 34.9545361,46.7773707 C34.9545361,39.6746493 40.7718297,33.8960118 47.9220646,33.8960118 C55.0733048,33.8960118 60.8905985,39.6746493 60.8905985,46.7773707 C60.8905985,48.8154213 60.3990387,50.7366411 59.5465996,52.4511599 L66.8556616,58.9906963 C68.2750531,60.265851 68.3896499,62.4496907 67.1119965,63.8626459 M21.2803274,29.392529 C21.2803274,29.9117776 21.3124949,30.429029 21.3738143,30.9293051 C21.4089975,31.2138932 21.3205368,31.4984814 21.1295422,31.7131707 C20.9777518,31.8839236 20.7736891,31.9967603 20.550527,32.0347054 C18.0786547,32.6687878 14.0104695,34.5880104 14.0104695,40.3456782 C14.0104695,44.6933865 16.4240382,47.0929141 18.4495863,48.3411077 C19.1411878,48.7744806 19.9594489,49.0051468 20.8229456,49.0141338 L32.9450717,49.0251179 L32.9430613,51.0222278 L20.811888,51.0112437 C19.5664021,50.9982625 18.384246,50.6607509 17.3840374,50.0346569 C15.3765836,48.7974474 12,45.8896553 12,40.3456782 C12,33.66235 16.5999543,31.191925 19.3000149,30.319188 C19.2799102,30.0116331 19.2698579,29.702081 19.2698579,29.392529 C19.2698579,23.9324305 22.9982737,18.2696254 27.9420183,16.2215892 C33.7241287,13.8150717 39.8500294,15.0083449 44.3263399,19.4109737 C45.7135638,20.7749998 46.8545053,22.4316024 47.7300648,24.3478294 C48.9061895,23.3802296 50.355738,22.8460027 51.8836949,22.8460027 C54.8863312,22.8460027 58.2659305,25.1097268 58.8680661,30.0605622 C61.6797078,30.7046302 67.6206453,32.9553731 67.6206453,40.422567 C67.6206453,43.4042521 66.6797455,45.8666886 64.8230769,47.7419748 L63.3896121,46.3410022 C64.8632863,44.8531553 65.6101757,42.8620367 65.6101757,40.422567 C65.6101757,33.891019 60.1055101,32.2663701 57.737177,31.8719409 C57.4677741,31.827006 57.2295334,31.6752256 57.0757325,31.4515493 C56.9259525,31.2358614 56.8686541,30.9712444 56.9138897,30.7146157 C56.5851779,26.6604826 54.1605516,24.8431126 51.8836949,24.8431126 C50.4472144,24.8431126 49.1001998,25.5381069 48.1874466,26.7503526 C47.9652897,27.0439277 47.6044105,27.193711 47.2344841,27.139789 C46.8695838,27.085867 46.5629872,26.8362283 46.4373329,26.4917268 C45.6140456,24.2260057 44.4278686,22.3207628 42.9119745,20.8309188 C39.0327735,17.0154404 33.7281496,15.9809374 28.7170543,18.0649216 C24.5463352,19.7924217 21.2803274,24.7672224 21.2803274,29.392529" id="cw-Amazon-CloudWatch_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-ssm" viewBox="0 0 80 80">
+      <g id="ssm-Icon-Architecture/64/Arch_AWS-Systems-Manager_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="ssm-Icon-Architecture-BG/64/Management-Governance" fill="#E7157B">
+          <rect id="ssm-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M47,54.998059 L60,54.998059 L60,56.9983576 L47,56.9983576 L47,58.9986562 L45,58.9986562 L45,56.9983576 L41,56.9983576 L41,54.998059 L45,54.998059 L45,53.9979097 L47,53.9979097 L47,54.998059 Z M51,48.9971632 L60,48.9971632 L60,50.9974618 L51,50.9974618 L51,52.9977604 L49,52.9977604 L49,50.9974618 L41,50.9974618 L41,48.9971632 L49,48.9971632 L49,47.9970139 L51,47.9970139 L51,48.9971632 Z M56,42.9962674 L60,42.9962674 L60,44.996566 L56,44.996566 L56,46.9968646 L54,46.9968646 L54,44.996566 L41,44.996566 L41,42.9962674 L54,42.9962674 L54,41.9961181 L56,41.9961181 L56,42.9962674 Z M21,46.9968646 L30,46.9968646 L30,48.9971632 L21,48.9971632 C19.745,48.9971632 18.404,48.6201069 17.413,47.9890127 C15.393,46.7098217 12,43.7153747 12,38.0415277 C12,31.1605005 16.665,28.6351235 19.38,27.7499913 L19.326,26.8338546 C19.324,21.1660085 23.074,15.3541409 28.046,13.2568278 C33.869,10.7814582 40.036,12.0076413 44.545,16.5373175 C45.944,17.9385267 47.096,19.6477818 47.978,21.6310779 C49.749,20.1558577 52.16,19.6507823 54.4,20.385892 C57.247,21.3200315 59.019,23.9514243 59.227,27.4939531 C62.065,28.1730545 68,30.5084031 68,38.1315411 C68,38.4165837 67.989,38.6916247 67.978,38.954664 L65.979,38.9016561 C65.989,38.6346162 66,38.3885795 66,38.1315411 C66,31.3975359 60.443,29.7062834 58.054,29.2922216 C57.784,29.2452146 57.546,29.0911916 57.394,28.8641577 C57.243,28.6391241 57.19,28.3630829 57.246,28.0980433 C57.217,25.1165982 55.956,23.0012824 53.776,22.2861757 C51.823,21.6430797 49.677,22.3521855 48.434,24.0444382 C48.214,24.3414825 47.853,24.4965057 47.482,24.4404973 C47.116,24.3874894 46.81,24.1354518 46.686,23.7863996 C45.853,21.4430498 44.656,19.4797567 43.129,17.9505284 C39.216,14.0189415 33.867,12.9547827 28.826,15.0991028 C24.618,16.8733676 21.324,22.0021333 21.324,26.7748458 L21.423,28.4290927 C21.451,28.9071641 21.136,29.3382284 20.671,29.4562461 C18.18,30.0903407 14,32.0486331 14,38.0415277 C14,42.5211964 16.438,45.0045672 18.485,46.2997605 C19.16,46.7308249 20.123,46.9968646 21,46.9968646 L21,46.9968646 Z M66,52.3176589 L64.236,52.2166438 C63.763,52.1916401 63.312,52.5176887 63.204,52.9957601 C62.866,54.4939838 62.278,55.9141958 61.456,57.2163902 C61.195,57.630452 61.271,58.1715328 61.637,58.4975814 L62.954,59.6717567 L59.673,62.9542468 L58.502,61.6410507 C58.176,61.2739959 57.633,61.1999849 57.222,61.4610238 C55.92,62.2831466 54.499,62.8722345 52.997,63.2112851 C52.521,63.3193012 52.191,63.7563665 52.22,64.2444394 L52.32,65.9997014 L47.68,65.9997014 L47.78,64.2424391 C47.809,63.7543662 47.479,63.317301 47.003,63.2092848 C45.505,62.8712344 44.084,62.2811463 42.78,61.4580234 C42.367,61.1959843 41.825,61.2709955 41.5,61.6380503 L40.326,62.9532466 L37.046,59.6717567 L38.361,58.4995817 C38.726,58.1735331 38.802,57.6324523 38.541,57.2193906 C37.72,55.9171962 37.132,54.4969842 36.794,52.9957601 C36.687,52.5176887 36.209,52.1916401 35.762,52.2166438 L34,52.3176589 L34,47.6769661 L35.768,47.7779812 C36.233,47.8039851 36.691,47.4769362 36.8,46.999865 C37.139,45.5046418 37.728,44.0864301 38.55,42.7852359 C38.811,42.371174 38.734,41.8290931 38.37,41.5040446 L37.046,40.3228683 L40.327,37.0413784 L41.508,38.3645759 C41.834,38.7286303 42.376,38.8036415 42.787,38.5436027 C44.087,37.7244804 45.505,37.1373927 47.003,36.7993423 C47.479,36.6913261 47.809,36.2542609 47.78,35.766188 L47.68,33.9949236 L52.32,33.9949236 L52.22,35.7681883 C52.191,36.2562612 52.521,36.6923263 52.997,36.8003424 C54.492,37.139393 55.909,37.7264807 57.211,38.5466031 C57.622,38.8076421 58.165,38.7316307 58.49,38.3675764 L59.673,37.0413784 L62.954,40.3228683 L61.633,41.5010441 C61.269,41.8270928 61.192,42.3681736 61.453,42.7822354 C62.275,44.0834297 62.864,45.5026415 63.202,46.999865 C63.31,47.4759361 63.763,47.8039851 64.234,47.7779812 L66,47.6769661 L66,52.3176589 Z M66.943,45.619659 L64.942,45.733676 C64.617,44.5885051 64.16,43.4873407 63.579,42.4451851 L65.076,41.1099858 C65.281,40.9269584 65.402,40.6679198 65.41,40.3918786 C65.418,40.1178377 65.312,39.8507978 65.117,39.6567688 L60.339,34.8780554 C60.145,34.6830263 59.868,34.5710096 59.604,34.5860118 C59.328,34.594013 59.069,34.714031 58.886,34.9190616 L57.546,36.4212858 C56.505,35.8411992 55.406,35.3861313 54.263,35.0600826 L54.377,33.0517828 C54.393,32.7767418 54.295,32.5077016 54.105,32.3076717 C53.917,32.1076419 53.654,31.994625 53.379,31.994625 L46.621,31.994625 C46.346,31.994625 46.083,32.1076419 45.895,32.3076717 C45.705,32.5077016 45.607,32.7767418 45.623,33.0517828 L45.737,35.0580823 C44.592,35.3831308 43.492,35.8391989 42.452,36.4182854 L41.114,34.9190616 C40.931,34.714031 40.672,34.594013 40.396,34.5860118 C40.113,34.5730099 39.855,34.6830263 39.661,34.8780554 L34.883,39.6567688 C34.688,39.8507978 34.582,40.1178377 34.59,40.3918786 C34.598,40.6669196 34.719,40.9269584 34.924,41.1099858 L36.424,42.4481855 C35.843,43.4903411 35.386,44.5895052 35.06,45.733676 L33.057,45.619659 C32.789,45.6016563 32.513,45.7026714 32.313,45.8906994 C32.113,46.0797277 32,46.3427669 32,46.617808 L32,53.376817 C32,53.6518581 32.113,53.9148973 32.313,54.1039255 C32.513,54.2919536 32.79,54.3899682 33.057,54.374966 L35.053,54.260949 C35.378,55.4091204 35.834,56.5112849 36.415,57.5544407 L34.924,58.8836391 C34.719,59.0666664 34.598,59.3267052 34.59,59.6017463 C34.582,59.8767873 34.688,60.1438272 34.883,60.3378562 L39.661,65.1165696 C39.855,65.3115987 40.138,65.4186146 40.396,65.4096133 C40.672,65.4016121 40.932,65.280594 41.114,65.0755634 L42.444,63.5833407 C43.487,64.1664277 44.59,64.6244961 45.736,64.9505448 L45.623,66.9428422 C45.607,67.2168831 45.705,67.4859233 45.895,67.6869533 C46.083,67.8869831 46.346,68 46.621,68 L53.379,68 C53.654,68 53.917,67.8869831 54.106,67.6869533 C54.295,67.4859233 54.393,67.2168831 54.377,66.9428422 L54.264,64.9525451 C55.412,64.6254962 56.515,64.168428 57.558,63.5863411 L58.886,65.0755634 C59.068,65.280594 59.328,65.4016121 59.604,65.4096133 C59.871,65.4216151 60.145,65.3115987 60.339,65.1165696 L65.117,60.3378562 C65.312,60.1438272 65.418,59.8767873 65.41,59.6017463 C65.402,59.3267052 65.281,59.0666664 65.075,58.8836391 L63.582,57.5524404 C64.163,56.5092846 64.619,55.4071201 64.945,54.260949 L66.943,54.374966 C67.213,54.3899682 67.487,54.2919536 67.687,54.1039255 C67.887,53.9148973 68,53.6518581 68,53.376817 L68,46.617808 C68,46.3427669 67.887,46.0797277 67.687,45.8906994 C67.487,45.7026714 67.214,45.6026564 66.943,45.619659 L66.943,45.619659 Z" id="ssm-AWS-Systems-Manager_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-iam" viewBox="0 0 80 80">
+      <g id="iam-Icon-Architecture/64/Arch_AWS-Identity-and-Access-Management_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="iam-Icon-Architecture-BG/64/Security-Identity-Compliance" fill="#DD344C">
+          <rect id="iam-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M14,59 L66,59 L66,21 L14,21 L14,59 Z M68,20 L68,60 C68,60.552 67.553,61 67,61 L13,61 C12.447,61 12,60.552 12,60 L12,20 C12,19.448 12.447,19 13,19 L67,19 C67.553,19 68,19.448 68,20 L68,20 Z M44,48 L59,48 L59,46 L44,46 L44,48 Z M57,42 L62,42 L62,40 L57,40 L57,42 Z M44,42 L52,42 L52,40 L44,40 L44,42 Z M29,46 C29,45.449 28.552,45 28,45 C27.448,45 27,45.449 27,46 C27,46.551 27.448,47 28,47 C28.552,47 29,46.551 29,46 L29,46 Z M31,46 C31,47.302 30.161,48.401 29,48.816 L29,51 L27,51 L27,48.815 C25.839,48.401 25,47.302 25,46 C25,44.346 26.346,43 28,43 C29.654,43 31,44.346 31,46 L31,46 Z M19,53.993 L36.994,54 L36.996,50 L33,50 L33,48 L36.996,48 L36.998,45 L33,45 L33,43 L36.999,43 L37,40.007 L19.006,40 L19,53.993 Z M22,38.001 L34,38.006 L34,31 C34.001,28.697 31.197,26.677 28,26.675 L27.996,26.675 C24.804,26.675 22.004,28.696 22.002,31 L22,38.001 Z M17,54.992 L17.006,39 C17.006,38.734 17.111,38.48 17.299,38.292 C17.486,38.105 17.741,38 18.006,38 L20,38.001 L20.002,31 C20.004,27.512 23.59,24.675 27.996,24.675 L28,24.675 C32.412,24.677 36.001,27.515 36,31 L36,38.007 L38,38.008 C38.553,38.008 39,38.456 39,39.008 L38.994,55 C38.994,55.266 38.889,55.52 38.701,55.708 C38.514,55.895 38.259,56 37.994,56 L18,55.992 C17.447,55.992 17,55.544 17,54.992 L17,54.992 Z M60,36 L62,36 L62,34 L60,34 L60,36 Z M44,36 L55,36 L55,34 L44,34 L44,36 Z" id="iam-AWS-Identity-and-Access-Management_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-sns" viewBox="0 0 80 80">
+      <g id="sns-Icon-Architecture/64/Arch_Amazon-Simple-Notification-Service_64" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="sns-Icon-Architecture-BG/64/Application-Integration" fill="#E7157B">
+          <rect id="sns-Rectangle" x="0" y="0" width="80" height="80" />
+        </g>
+        <path d="M17,38 C18.103,38 19,38.897 19,40 C19,41.103 18.103,42 17,42 C15.897,42 15,41.103 15,40 C15,38.897 15.897,38 17,38 L17,38 Z M41,64 C29.314,64 19.289,55.466 17.194,43.98 C18.965,43.894 20.427,42.659 20.857,41 L27,41 L27,39 L20.857,39 C20.427,37.342 18.966,36.107 17.195,36.02 C19.285,24.71 29.511,16 41,16 C45.313,16 49.832,17.622 54.429,20.821 L55.571,19.179 C50.633,15.743 45.73,14 41,14 C28.27,14 16.949,23.865 15.063,36.521 C13.839,37.207 13,38.5 13,40 C13,41.5 13.839,42.793 15.063,43.478 C16.97,56.341 28.056,66 41,66 C46.407,66 51.942,64.157 56.585,60.811 L55.415,59.189 C51.11,62.292 45.991,64 41,64 L41,64 Z M30.101,36.442 C31.955,36.895 34.275,37 36,37 C37.642,37 39.823,36.905 41.629,36.506 L37.105,45.553 C37.036,45.691 37,45.845 37,46 L37,50.453 C36.199,50.964 34.833,51.812 34,51.986 L34,46 C34,45.868 33.974,45.737 33.923,45.615 L30.101,36.442 Z M36,33 C40.025,33 42.174,33.604 42.841,34 C42.174,34.396 40.025,35 36,35 C31.975,35 29.826,34.396 29.159,34 C29.826,33.604 31.975,33 36,33 L36,33 Z M33,54 L34,54 C34.043,54 34.086,53.997 34.128,53.992 C35.352,53.833 36.909,52.887 38.272,52.013 L38.535,51.845 C38.824,51.661 39,51.342 39,51 L39,46.236 L44.559,35.12 C44.833,34.801 45,34.434 45,34 C45,31.39 39.361,31 36,31 C32.639,31 27,31.39 27,34 C27,34.366 27.12,34.684 27.32,34.967 L32,46.2 L32,53 C32,53.552 32.447,54 33,54 L33,54 Z M62,53 C63.103,53 64,53.897 64,55 C64,56.103 63.103,57 62,57 C60.897,57 60,56.103 60,55 C60,53.897 60.897,53 62,53 L62,53 Z M62,23 C63.103,23 64,23.897 64,25 C64,26.103 63.103,27 62,27 C60.897,27 60,26.103 60,25 C60,23.897 60.897,23 62,23 L62,23 Z M64,38 C65.103,38 66,38.897 66,40 C66,41.103 65.103,42 64,42 C62.897,42 62,41.103 62,40 C62,38.897 62.897,38 64,38 L64,38 Z M54,41 L60.143,41 C60.589,42.72 62.142,44 64,44 C66.206,44 68,42.206 68,40 C68,37.794 66.206,36 64,36 C62.142,36 60.589,37.28 60.143,39 L54,39 L54,26 L58.143,26 C58.589,27.72 60.142,29 62,29 C64.206,29 66,27.206 66,25 C66,22.794 64.206,21 62,21 C60.142,21 58.589,22.28 58.143,24 L53,24 C52.447,24 52,24.448 52,25 L52,39 L45,39 L45,41 L52,41 L52,55 C52,55.552 52.447,56 53,56 L58.143,56 C58.589,57.72 60.142,59 62,59 C64.206,59 66,57.206 66,55 C66,52.794 64.206,51 62,51 C60.142,51 58.589,52.28 58.143,54 L54,54 L54,41 Z" id="sns-AWS-Simple-Notification-Service_Icon_64_Squid" fill="#FFFFFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-igw" viewBox="0 0 48 48">
+      <g id="igw-Icon-Resource/Networking-and-Content-Delivery/Res_Amazon-VPC_Internet-Gateway_48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M33.4312,35.1778 L31.9332,35.1778 L31.9332,17.5018 C31.9332,17.1088 31.7022,16.7518 31.3442,16.5908 L31.2522,16.5488 C29.2432,15.6418 27.1642,14.7028 24.1762,14.7028 C21.0532,14.7028 18.7612,15.7118 16.4952,16.8368 C16.1552,17.0058 15.9402,17.3528 15.9402,17.7328 L15.9402,35.1778 L14.4772,35.1778 L14.4772,16.3118 C16.9112,14.3328 20.4202,13.2048 24.1862,13.2048 C27.6872,13.2048 31.0252,14.2018 33.4312,15.9528 L33.4312,35.1778 Z M24.1862,11.2048 C19.7612,11.2048 15.6172,12.6238 12.8152,15.0998 C12.6002,15.2888 12.4772,15.5618 12.4772,15.8488 L12.4772,36.1778 C12.4772,36.7308 12.9242,37.1778 13.4772,37.1778 L16.9402,37.1778 C17.4932,37.1778 17.9402,36.7308 17.9402,36.1778 L17.9402,18.3558 C19.8592,17.4288 21.7192,16.7028 24.1762,16.7028 C26.5112,16.7028 28.2092,17.3778 29.9332,18.1488 L29.9332,36.1778 C29.9332,36.7308 30.3802,37.1778 30.9332,37.1778 L34.4312,37.1778 C34.9842,37.1778 35.4312,36.7308 35.4312,36.1778 L35.4312,15.4578 C35.4312,15.1538 35.2922,14.8658 35.0532,14.6748 C32.2792,12.4698 28.3182,11.2048 24.1862,11.2048 L24.1862,11.2048 Z M23.9542,43.9088 C12.9522,43.9088 3.9992,34.9568 3.9992,23.9538 C3.9992,12.9508 12.9522,3.9998 23.9542,3.9998 C34.9572,3.9998 43.9092,12.9508 43.9092,23.9538 C43.9092,34.9568 34.9572,43.9088 23.9542,43.9088 L23.9542,43.9088 Z M23.9542,1.9998 C11.8482,1.9998 1.9992,11.8488 1.9992,23.9538 C1.9992,36.0608 11.8482,45.9088 23.9542,45.9088 C36.0602,45.9088 45.9092,36.0608 45.9092,23.9538 C45.9092,11.8488 36.0602,1.9998 23.9542,1.9998 L23.9542,1.9998 Z" id="igw-AWS-Amazon-VPC_Internet-gateway_Resource-Icon_light-bg" fill="#8C4FFF" />
+      </g>
+    </symbol>
+    <symbol id="icon-alarm" viewBox="0 0 48 48">
+      <g id="alarm-Icon-Resource/Management-Governance/Res_Amazon-CloudWatch_Alarm_48" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M41.4246,40.6675 L34.6366,40.6675 L34.6366,19.8305 C36.8216,20.5265 39.2386,20.5265 41.4246,19.8305 L41.4246,40.6675 Z M41.9946,17.4595 C39.4996,18.6475 36.5596,18.6465 34.0666,17.4595 C33.7586,17.3125 33.3946,17.3335 33.1026,17.5165 C32.8126,17.6995 32.6366,18.0185 32.6366,18.3615 L32.6366,41.6675 C32.6366,42.2205 33.0836,42.6675 33.6366,42.6675 L42.4246,42.6675 C42.9776,42.6675 43.4246,42.2205 43.4246,41.6675 L43.4246,18.3615 C43.4246,18.0185 43.2486,17.6995 42.9586,17.5165 C42.6676,17.3335 42.3036,17.3115 41.9946,17.4595 L41.9946,17.4595 Z M38.0306,4.0005 C40.8716,4.0005 43.1826,6.3115 43.1826,9.1515 C43.1826,11.9925 40.8716,14.3035 38.0306,14.3035 C35.1906,14.3035 32.8796,11.9925 32.8796,9.1515 C32.8796,6.3115 35.1906,4.0005 38.0306,4.0005 L38.0306,4.0005 Z M38.0306,16.3035 C41.9746,16.3035 45.1826,13.0955 45.1826,9.1515 C45.1826,5.2085 41.9746,2.0005 38.0306,2.0005 C34.0876,2.0005 30.8796,5.2085 30.8796,9.1515 C30.8796,13.0955 34.0876,16.3035 38.0306,16.3035 L38.0306,16.3035 Z M2.0006,46.1835 L45.9406,46.1835 L45.9406,44.1835 L2.0006,44.1835 L2.0006,46.1835 Z M20.5756,40.6675 L27.3636,40.6675 L27.3636,27.7285 L20.5756,27.7285 L20.5756,40.6675 Z M19.5756,42.6675 L28.3636,42.6675 C28.9166,42.6675 29.3636,42.2205 29.3636,41.6675 L29.3636,26.7285 C29.3636,26.1755 28.9166,25.7285 28.3636,25.7285 L19.5756,25.7285 C19.0236,25.7285 18.5756,26.1755 18.5756,26.7285 L18.5756,41.6675 C18.5756,42.2205 19.0236,42.6675 19.5756,42.6675 L19.5756,42.6675 Z M6.5156,40.6675 L13.3036,40.6675 L13.3036,23.3345 L6.5156,23.3345 L6.5156,40.6675 Z M5.5156,42.6675 L14.3036,42.6675 C14.8566,42.6675 15.3036,42.2205 15.3036,41.6675 L15.3036,22.3345 C15.3036,21.7815 14.8566,21.3345 14.3036,21.3345 L5.5156,21.3345 C4.9626,21.3345 4.5156,21.7815 4.5156,22.3345 L4.5156,41.6675 C4.5156,42.2205 4.9626,42.6675 5.5156,42.6675 L5.5156,42.6675 Z" id="alarm-Amazon-Cloudwatch_alarm_Resource-Icon_light-bg" fill="#E7157B" />
+      </g>
+    </symbol>
+  </defs>
+  <rect width="1200" height="2230" fill="#FFFFFF" />
+  <text id="title" x="36" y="48" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="36" dy="0">AWS infrastructure &amp; controlled delivery</tspan>
+  </text>
+  <text id="subtitle" x="36" y="81" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="36" dy="0">Single-instance lab • Terraform adoption • OIDC-authenticated application delivery</tspan>
+  </text>
+  <text id="regional-heading" x="36" y="139" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="36" dy="0">01 / Regional workload &amp; observability</tspan>
+  </text>
+  <rect id="region" x="220" y="176" width="950" height="824" rx="10" fill="#FAFCFF" stroke="#52677F" stroke-width="2" />
+  <text id="region-label" x="242" y="210" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="242" dy="0">AWS Region  us-east-2</tspan>
+  </text>
+  <rect id="vpc" x="242" y="236" width="570" height="730" rx="10" fill="#FFFFFF" stroke="#7B67A7" stroke-width="2" />
+  <text id="vpc-label" x="260" y="265" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="260" dy="0">Custom VPC  10.20.0.0/16</tspan>
+  </text>
+  <rect id="az-one" x="258" y="394" width="276" height="460" rx="10" fill="#FCFDFE" stroke="#BCC8D5" stroke-width="1.5" stroke-dasharray="7 5" />
+  <rect id="az-two" x="536" y="394" width="262" height="460" rx="10" fill="#FCFDFE" stroke="#BCC8D5" stroke-width="1.5" stroke-dasharray="7 5" />
+  <text id="az-one-label" x="275" y="425" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="275" dy="0">Availability Zone  us-east-2a</tspan>
+  </text>
+  <text id="az-two-label" x="550" y="425" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="550" dy="0">Availability Zone  us-east-2b</tspan>
+  </text>
+  <rect id="public-one" x="272" y="458" width="248" height="252" rx="10" fill="#ECF8F5" stroke="#78B7A9" stroke-width="1.5" />
+  <rect id="public-two" x="548" y="458" width="238" height="252" rx="10" fill="#ECF8F5" stroke="#78B7A9" stroke-width="1.5" />
+  <rect id="private-one" x="272" y="770" width="248" height="72" rx="10" fill="#F1F5FA" stroke="#A9BACD" stroke-width="1.5" />
+  <rect id="private-two" x="548" y="770" width="238" height="72" rx="10" fill="#F1F5FA" stroke="#A9BACD" stroke-width="1.5" />
+  <path id="public-association-one" d="M 608 350 L 608 375 L 530 375 L 530 440 L 396 440 L 396 458" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="public-association-two" d="M 530 440 L 667 440 L 667 458" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="private-association-one" d="M 610 887 L 610 865 L 396 865 L 396 842" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="private-association-two" d="M 610 865 L 667 865 L 667 842" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="internet-to-gateway" d="M 186 320 L 260 320" fill="none" stroke="#087F70" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-public)" />
+  <path id="gateway-to-server" d="M 278 350 L 250 350 L 250 562 L 286 562" fill="none" stroke="#087F70" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-public)" />
+  <path id="default-route-target" d="M 430 319 L 410 319" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="host-telemetry" d="M 508 624 L 527 624 L 527 742 L 839 742 L 839 533 L 864 533" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <path id="cloudwatch-dashboard" d="M 1002 450 L 1002 394" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <path id="cloudwatch-alarm" d="M 1002 590 L 1002 660" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <path id="alarm-sns" d="M 1002 754 L 1002 820" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <path id="sns-email" d="M 1002 910 L 1002 1031" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <rect id="browser" x="32" y="281" width="154" height="78" rx="10" fill="#FFFFFF" stroke="#9CAABA" stroke-width="1.5" />
+  <text id="browser-title" x="109" y="312" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#24354B" text-anchor="middle">
+    <tspan x="109" dy="0">Public browser</tspan>
+  </text>
+  <text id="browser-note" x="109" y="338" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#087F70" text-anchor="middle">
+    <tspan x="109" dy="0">HTTP :80</tspan>
+  </text>
+  <rect id="gateway" x="260" y="286" width="150" height="64" rx="10" fill="#FFFFFF" stroke="#B9A7CF" stroke-width="1.5" />
+  <use id="gateway-icon" href="#icon-igw" x="270" y="298" width="36" height="36" />
+  <text id="gateway-title" x="313" y="311" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="313" dy="0">Internet</tspan>
+    <tspan x="313" dy="22">gateway</tspan>
+  </text>
+  <rect id="public-table" x="430" y="286" width="356" height="64" rx="10" fill="#FFFFFF" stroke="#BCC8D5" stroke-width="1.5" />
+  <text id="public-table-title" x="446" y="311" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="446" dy="0">Public route table</tspan>
+  </text>
+  <text id="public-table-route" x="446" y="336" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="446" dy="0">0.0.0.0/0 → internet gateway</tspan>
+  </text>
+  <text id="public-route-associations-label" x="440" y="366" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="440" dy="0">Explicit associations</tspan>
+  </text>
+  <text id="public-one-title" x="286" y="484" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="286" dy="0">Public subnet 1</tspan>
+  </text>
+  <text id="public-one-cidr" x="286" y="506" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="286" dy="0">10.20.1.0/24</tspan>
+  </text>
+  <text id="public-two-title" x="562" y="484" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="562" dy="0">Public subnet 2</tspan>
+  </text>
+  <text id="public-two-cidr" x="562" y="506" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="562" dy="0">10.20.2.0/24</tspan>
+  </text>
+  <text id="unused-public-title" x="667" y="590" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#66788B" text-anchor="middle">
+    <tspan x="667" dy="0">Unused</tspan>
+  </text>
+  <text id="unused-public-note" x="667" y="618" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#66788B" text-anchor="middle">
+    <tspan x="667" dy="0">No workload</tspan>
+  </text>
+  <rect id="web-security-group" x="286" y="521" width="222" height="133" rx="10" fill="#FFFFFF" stroke="#CD9A46" stroke-width="1.5" stroke-dasharray="7 5" />
+  <text id="security-label" x="298" y="544" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="298" dy="0">Security group</tspan>
+  </text>
+  <use id="compute-icon" href="#icon-ec2" x="298" y="555" width="38" height="38" />
+  <text id="compute-label" x="347" y="574" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="347" dy="0">EC2 · t3.micro</tspan>
+  </text>
+  <text id="compute-os" x="347" y="595" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="347" dy="0">Amazon Linux 2023</tspan>
+  </text>
+  <text id="compute-web" x="347" y="616" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="347" dy="0">Nginx · IMDSv2</tspan>
+  </text>
+  <text id="agent-label" x="298" y="643" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="298" dy="0">CloudWatch Agent</tspan>
+  </text>
+  <text id="security-note" x="286" y="731" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#087F70" text-anchor="start">
+    <tspan x="286" dy="0">HTTP allowed · no inbound SSH</tspan>
+  </text>
+  <rect id="root-volume" x="286" y="666" width="222" height="33" rx="5" fill="#FFFFFF" stroke="#C7D5CF" stroke-width="1.5" />
+  <use id="root-volume-icon" href="#icon-ebs" x="291" y="670" width="25" height="25" />
+  <text id="root-volume-label" x="324" y="689" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="324" dy="0">8 GiB gp3 · encrypted</tspan>
+  </text>
+  <text id="private-one-title" x="286" y="796" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="286" dy="0">Private subnet 1 · unused</tspan>
+  </text>
+  <text id="private-one-cidr" x="286" y="825" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="286" dy="0">10.20.11.0/24</tspan>
+  </text>
+  <text id="private-two-title" x="562" y="796" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="562" dy="0">Private subnet 2 · unused</tspan>
+  </text>
+  <text id="private-two-cidr" x="562" y="825" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="562" dy="0">10.20.12.0/24</tspan>
+  </text>
+  <rect id="private-table" x="430" y="887" width="356" height="61" rx="10" fill="#FFFFFF" stroke="#BCC8D5" stroke-width="1.5" />
+  <text id="private-table-title" x="446" y="911" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="446" dy="0">Private route table</tspan>
+  </text>
+  <text id="private-table-route" x="446" y="935" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="446" dy="0">VPC-local only · no internet route</tspan>
+  </text>
+  <text id="monitoring-corridor-label" x="587" y="731" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#A76104" text-anchor="start">
+    <tspan x="587" dy="0">Host telemetry</tspan>
+  </text>
+  <text id="monitoring-heading" x="864" y="267" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="864" dy="0">Monitoring &amp; alerting</tspan>
+  </text>
+  <rect id="dashboard" x="864" y="307" width="278" height="87" rx="10" fill="#FFFFFF" stroke="#D5C2A7" stroke-width="1.5" />
+  <use id="dashboard-icon" href="#icon-cw" x="878" y="321" width="40" height="40" />
+  <text id="dashboard-title" x="929" y="337" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="929" dy="0">Dashboard</tspan>
+  </text>
+  <text id="dashboard-detail" x="881" y="375" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="881" dy="0">CPU · memory · disk · network</tspan>
+  </text>
+  <rect id="cloudwatch" x="864" y="450" width="278" height="140" rx="10" fill="#FFFFFF" stroke="#D5C2A7" stroke-width="1.5" />
+  <use id="cloudwatch-icon" href="#icon-cw" x="878" y="464" width="40" height="40" />
+  <text id="cloudwatch-title" x="929" y="491" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="929" dy="0">CloudWatch</tspan>
+  </text>
+  <text id="cloudwatch-detail" x="881" y="527" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="881" dy="0">CPU / network from EC2</tspan>
+    <tspan x="881" dy="25">Memory / disk from Agent</tspan>
+    <tspan x="881" dy="25">Nginx logs · 7-day retention</tspan>
+  </text>
+  <text id="alarm-source-label" x="1016" y="627" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#A76104" text-anchor="start">
+    <tspan x="1016" dy="0">CPU</tspan>
+  </text>
+  <rect id="cpu-alarm" x="864" y="660" width="278" height="94" rx="10" fill="#FFFFFF" stroke="#D5C2A7" stroke-width="1.5" />
+  <use id="cpu-alarm-icon" href="#icon-alarm" x="878" y="674" width="37" height="37" />
+  <text id="cpu-alarm-title" x="929" y="693" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="929" dy="0">CPU alarm</tspan>
+  </text>
+  <text id="cpu-alarm-detail" x="881" y="733" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="881" dy="0">≥80% · two 5-minute periods</tspan>
+  </text>
+  <text id="alarm-action-label" x="1016" y="793" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#A76104" text-anchor="start">
+    <tspan x="1016" dy="0">ALARM action</tspan>
+  </text>
+  <rect id="sns-topic" x="864" y="820" width="278" height="90" rx="10" fill="#FFFFFF" stroke="#D5C2A7" stroke-width="1.5" />
+  <use id="sns-icon" href="#icon-sns" x="878" y="833" width="40" height="40" />
+  <text id="sns-title" x="929" y="858" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="929" dy="0">Amazon SNS</tspan>
+  </text>
+  <text id="sns-detail" x="881" y="888" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="881" dy="0">Existing notification topic</tspan>
+  </text>
+  <text id="notification-label" x="1016" y="965" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#A76104" text-anchor="start">
+    <tspan x="1016" dy="0">Email</tspan>
+  </text>
+  <rect id="email" x="864" y="1031" width="278" height="67" rx="10" fill="#FFFFFF" stroke="#B6C2CD" stroke-width="1.5" />
+  <text id="email-title" x="1003" y="1057" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#24354B" text-anchor="middle">
+    <tspan x="1003" dy="0">Confirmed email recipient</tspan>
+  </text>
+  <text id="email-note" x="1003" y="1082" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#536477" text-anchor="middle">
+    <tspan x="1003" dy="0">Subscription outside Terraform</tspan>
+  </text>
+  <text id="topology-note" x="36" y="1040" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="36" dy="0">One workload; three subnets have no application.</tspan>
+    <tspan x="36" dy="29">No NAT gateway, load balancer or failover tier.</tspan>
+  </text>
+  <text id="subnet-ip-note" x="36" y="1116" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="36" dy="0">All subnets: public-IP auto-assignment off; the EC2 launch explicitly enables its public association.</tspan>
+  </text>
+  <text id="delivery-heading" x="36" y="1172" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="36" dy="0">02 / Deployment architecture · currently suspended</tspan>
+  </text>
+  <rect id="github" x="36" y="1200" width="1128" height="177" rx="10" fill="#F6F9FD" stroke="#BCC8D5" stroke-width="1.5" />
+  <text id="github-label" x="56" y="1230" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">GitHub Actions</tspan>
+  </text>
+  <path id="manual-to-gate" d="M 355 1294 L 425 1294" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <path id="ci-to-gate" d="M 813 1294 L 743 1294" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <rect id="manual-dispatch" x="56" y="1250" width="299" height="101" rx="10" fill="#FFFFFF" stroke="#B9CFF4" stroke-width="1.5" />
+  <text id="manual-title" x="73" y="1279" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="73" dy="0">CD workflows disabled</tspan>
+  </text>
+  <text id="manual-description" x="73" y="1310" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="73" dy="0">CI remains active</tspan>
+    <tspan x="73" dy="25">No deployment dispatch permitted</tspan>
+  </text>
+  <rect id="exact-commit-gate" x="425" y="1250" width="318" height="101" rx="10" fill="#FFFFFF" stroke="#B9CFF4" stroke-width="1.5" />
+  <text id="gate-title" x="442" y="1279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="442" dy="0">Exact-commit authorization</tspan>
+  </text>
+  <text id="gate-description" x="442" y="1310" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="442" dy="0">Selected SHA = dispatch = main</tspan>
+    <tspan x="442" dy="25">Newest applicable CI must pass</tspan>
+  </text>
+  <rect id="continuous-integration" x="813" y="1250" width="331" height="101" rx="10" fill="#FFFFFF" stroke="#BCC8D5" stroke-width="1.5" />
+  <text id="ci-title" x="830" y="1279" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="830" dy="0">CI · read-only validation</tspan>
+  </text>
+  <text id="ci-description" x="830" y="1310" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="830" dy="0">Source + security/recovery tests</tspan>
+    <tspan x="830" dy="25">Locked Terraform init / validate</tspan>
+  </text>
+  <rect id="identity-plane" x="36" y="1420" width="1128" height="157" rx="10" fill="#FFFFFF" stroke="#C4B1CB" stroke-width="1.5" />
+  <text id="identity-heading" x="56" y="1450" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">AWS IAM (global) &amp; STS federation</tspan>
+  </text>
+  <path id="gate-to-federation" d="M 584 1351 L 584 1395 L 20 1395 L 20 1515 L 56 1515" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <path id="federation-to-role" d="M 355 1515 L 425 1515" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <rect id="oidc-sts" x="56" y="1474" width="299" height="81" rx="10" fill="#FCF7FD" stroke="#CFB6D4" stroke-width="1.5" />
+  <use id="oidc-icon" href="#icon-iam" x="69" y="1490" width="35" height="35" />
+  <text id="oidc-title" x="114" y="1501" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="114" dy="0">GitHub OIDC → STS</tspan>
+  </text>
+  <text id="oidc-detail" x="70" y="1535" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="70" dy="0">Audience: sts.amazonaws.com</tspan>
+  </text>
+  <rect id="deployment-role" x="425" y="1474" width="370" height="81" rx="10" fill="#FCF7FD" stroke="#CFB6D4" stroke-width="1.5" />
+  <text id="deployment-role-title" x="441" y="1501" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="441" dy="0">Deployment role + boundary</tspan>
+  </text>
+  <text id="deployment-role-detail" x="441" y="1535" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="441" dy="0">Federation + session access denied</tspan>
+  </text>
+  <rect id="instance-role" x="835" y="1474" width="309" height="81" rx="10" fill="#FCF7FD" stroke="#CFB6D4" stroke-width="1.5" />
+  <use id="instance-role-icon" href="#icon-iam" x="848" y="1488" width="35" height="35" />
+  <text id="instance-role-title" x="893" y="1501" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="893" dy="0">EC2 IAM role</tspan>
+  </text>
+  <text id="instance-role-detail" x="849" y="1535" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="849" dy="0">SSM + CloudWatch permissions</tspan>
+  </text>
+  <rect id="management-region" x="36" y="1610" width="1128" height="265" rx="10" fill="#FAFCFF" stroke="#52677F" stroke-width="2" />
+  <text id="management-region-title" x="56" y="1643" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">us-east-2 · Systems Manager delivery to the existing workload</tspan>
+  </text>
+  <path id="role-to-document" d="M 608 1555 L 608 1595 L 20 1595 L 20 1748 L 56 1748" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <path id="instance-role-attachment" d="M 989 1555 L 989 1669" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <path id="document-to-instance" d="M 560 1748 L 785 1748" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <rect id="restricted-executor" x="56" y="1669" width="504" height="169" rx="10" fill="#FFFFFF" stroke="#B9CFF4" stroke-width="1.5" />
+  <use id="ssm-icon" href="#icon-ssm" x="72" y="1683" width="40" height="40" />
+  <text id="ssm-title" x="124" y="1709" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="124" dy="0">Restricted SSM deployment executor</tspan>
+  </text>
+  <text id="ssm-details" x="74" y="1742" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="74" dy="0">Dedicated document · pinned version + hash</tspan>
+    <tspan x="74" dy="29">ENV_VAR inputs · seven approved file hashes</tspan>
+    <tspan x="74" dy="29">Fixed four-script sequence · lock + failure latch</tspan>
+  </text>
+  <text id="managed-channel" x="673" y="1717" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#2563EB" text-anchor="middle">
+    <tspan x="673" dy="0">Managed SSM</tspan>
+    <tspan x="673" dy="23">command channel</tspan>
+  </text>
+  <text id="no-ssh" x="673" y="1780" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#2563EB" text-anchor="middle">
+    <tspan x="673" dy="0">No inbound SSH</tspan>
+  </text>
+  <rect id="same-workload" x="785" y="1669" width="359" height="169" rx="10" fill="#FFFFFF" stroke="#B9CFF4" stroke-width="1.5" />
+  <use id="same-workload-icon" href="#icon-ec2" x="801" y="1684" width="40" height="40" />
+  <text id="same-workload-title" x="853" y="1710" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="853" dy="0">Existing lab EC2</tspan>
+  </text>
+  <text id="same-workload-details" x="803" y="1742" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="803" dy="0">Same single instance shown above</tspan>
+    <tspan x="803" dy="29">Nginx + CloudWatch Agent</tspan>
+    <tspan x="803" dy="29">Scoped permissions; no shell input</tspan>
+  </text>
+  <text id="management-network-note" x="56" y="1860" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#536477" text-anchor="start">
+    <tspan x="56" dy="0">SSM Agent opens outbound connections; blue arrows show logical control, not inbound network access.</tspan>
+  </text>
+  <text id="infrastructure-heading" x="36" y="1931" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="36" dy="0">03 / Separate Terraform infrastructure management</tspan>
+  </text>
+  <rect id="terraform-lane" x="36" y="1955" width="1128" height="121" rx="10" fill="#F9F7FC" stroke="#C3B4D6" stroke-width="1.5" />
+  <path id="terraform-plan" d="M 355 2016 L 425 2016" fill="none" stroke="#7056A7" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-infra)" />
+  <path id="plan-to-infrastructure" d="M 743 2016 L 813 2016" fill="none" stroke="#7056A7" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-infra)" />
+  <text id="terraform-title" x="56" y="1999" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">Terraform · private local state</tspan>
+  </text>
+  <text id="terraform-description" x="56" y="2032" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">33 managed resources</tspan>
+    <tspan x="56" dy="23">4 read-only data sources</tspan>
+  </text>
+  <text id="operator-plan-title" x="425" y="1999" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="425" dy="0">Operator-reviewed full plan</tspan>
+  </text>
+  <text id="operator-plan-description" x="425" y="2032" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="425" dy="0">Separate approval before apply</tspan>
+  </text>
+  <text id="managed-resources-title" x="813" y="1999" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="813" dy="0">AWS infrastructure</tspan>
+  </text>
+  <text id="managed-resources-description" x="813" y="2032" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="813" dy="0">Network · EC2/IAM · monitoring</tspan>
+    <tspan x="813" dy="23">OIDC · boundary · SSM document</tspan>
+  </text>
+  <rect id="legend" x="36" y="2104" width="1128" height="101" rx="10" fill="#F6F8FB" stroke="#D5DDE7" stroke-width="1.5" />
+  <text id="legend-title" x="56" y="2133" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#24354B" text-anchor="start">
+    <tspan x="56" dy="0">Legend</tspan>
+  </text>
+  <path id="legend-public" d="M 159 2127 L 205 2127" fill="none" stroke="#087F70" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-public)" />
+  <text id="legend-public-text" x="218" y="2133" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="218" dy="0">Public HTTP traffic</tspan>
+  </text>
+  <path id="legend-delivery" d="M 464 2127 L 510 2127" fill="none" stroke="#2563EB" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-delivery)" />
+  <text id="legend-delivery-text" x="523" y="2133" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="523" dy="0">Delivery / control</tspan>
+  </text>
+  <path id="legend-monitor" d="M 777 2127 L 823 2127" fill="none" stroke="#A76104" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#arrow-monitor)" />
+  <text id="legend-monitor-text" x="836" y="2133" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="836" dy="0">Metrics / logs / alerts</tspan>
+  </text>
+  <path id="legend-infra" d="M 159 2171 L 205 2171" fill="none" stroke="#7056A7" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-infra)" />
+  <text id="legend-infra-text" x="218" y="2177" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="218" dy="0">Infrastructure management</tspan>
+  </text>
+  <path id="legend-association" d="M 555 2171 L 601 2171" fill="none" stroke="#728093" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 6" marker-end="url(#arrow-assoc)" />
+  <text id="legend-association-text" x="614" y="2177" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="400" fill="#24354B" text-anchor="start">
+    <tspan x="614" dy="0">Route / role association</tspan>
+  </text>
+</svg>

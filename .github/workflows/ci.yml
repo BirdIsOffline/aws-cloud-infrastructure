@@ -60,3 +60,6 @@ jobs:
       - name: Validate Terraform configuration
         working-directory: terraform
         run: terraform validate
+      - name: Verify CI-only deployment suspension with mocked AWS
+        working-directory: terraform
+        run: terraform test

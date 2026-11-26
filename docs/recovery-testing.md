@@ -1,12 +1,126 @@
-# Isolated failure and recovery tests
+# Testing, resilience and recovery record
 
-The recovery harness runs offline Linux simulations, not live server tests. The
-first hosted run executed all 31 recovery cases and identified a disposable-root
-initialization omission: `/tmp` was missing. Bare `mktemp`, used by unchanged
-server verification, requires `/tmp` when `TMPDIR` is unset. The corrected fixture
-creates and resets root-owned `/tmp` and `/var/tmp` with mode 1777. Two additional
-Linux readiness guards reproduce the missing-directory failure and verify bare
-`mktemp` succeeds with safe metadata. Windows still has no installed Linux runtime.
+The resilience testing phase is concluded. Results below distinguish hosted
+Linux simulations, private offline verification, and separately authorized live
+tests. Earlier failed or incomplete reports remain preserved; later health
+confirmation does not retroactively turn them into passing recovery tests.
+
+## Verified outcomes
+
+| Evidence | Result | Verification boundary |
+| --- | --- | --- |
+| Hosted Ubuntu CI | 114 tests passed, zero skips/failures/errors | 81 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
+| Private operator-wrapper checks | 225 passed: 170 server, 31 controller, 24 observer | Offline replay/adapters and negative cases; separate from repository CI and live recovery |
+| OIDC-authenticated delivery | End-to-end success after telemetry correction | Exact-commit authorization, temporary role assumption, restricted SSM, four zero exits, HTTP, monitoring and masking |
+| Live idempotency | Strict configuration idempotency demonstrated | Compliant-file content/metadata, packages, service identities and backup inventory unchanged |
+| Live website restoration | Passed | Approved homepage restored through the existing rollback interface under the deployment lock |
+| Live Agent restoration | Monitoring recovered; complete verification did not pass | Baseline/metadata-classification gaps and final preflight abort are recorded below |
+| CloudWatch-to-SNS notification | Successful action and operator-confirmed matching email | One simulated ALARM transition; no genuine CPU threshold breach |
+
+The successful hosted result is recorded at
+[CI run 45578485098](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45578485098)
+for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. The repository is
+private, so viewing that run requires access. Private operator evidence and its
+225-check harness are not included in the public source or the hosted test total.
+
+## Live deployment and strict idempotency
+
+The corrected authenticated deployment completed authorization, OIDC/STS,
+exactly one restricted SSM execution, and all four server scripts at exit 0.
+Local/public HTTP returned 200 with approved content; the former backup URL
+returned 404. Fresh memory/disk observations, positive access-group ingestion,
+expected streams, seven-day retention and runtime identifier masking passed.
+
+Controlled repeat-run testing compared checksums, inodes, mtime/ctime, numeric
+ownership, permissions, package versions, service processes/activation timestamps
+and recovery backup inventory. Compliant targets were unchanged: no unnecessary
+package transaction, file replacement, metadata write, reload, restart or backup.
+Temporary staging/operation records, request logs and normal metric delivery are
+expected activity and were distinguished from persistent configuration changes.
+
+## Live website restoration
+
+The operator held the existing deployment lock and verified durable private
+copies before atomically adding one harmless HTML comment. The existing website
+rollback interface returned 0 and restored the exact approved homepage, ownership
+and permissions. Nginx configuration remained valid; local/public HTTP returned
+200 and the former backup URL 404. Service identities and package inventory were
+unchanged, with no unnecessary restart/reload and no residual latch or command.
+
+The controlled comment was exposed for approximately 0.177 seconds; the normal
+test sequence took 0.85 seconds, within its 120-second bound. Atomic restoration
+changed homepage inode, mtime and ctime, and document-root directory timestamps.
+Those intentional changes were recorded rather than described as idempotency.
+Original content/security metadata and pre-existing backups were preserved.
+This was a live reversible restoration exercise, not instance-loss recovery.
+
+## Live CloudWatch Agent restoration: closed with limitations
+
+Earlier controlled interruptions were followed by a successful unchanged
+monitoring rollback interface and healthy Agent service. A recorded retest
+completed activation in 1.506 seconds, with an inactive interval of 1.165 seconds,
+below the 150-second activation bound. Read-only follow-up confirmed approved
+configuration, fresh memory/disk metrics and positive access-group ingestion,
+expected streams, seven-day retention, and continued website health.
+
+The complete live verification did not pass:
+
+- The first run lacked a persisted original `common-config.toml` fingerprint and
+  rejected its ctime change. Installed-version investigation established that
+  native activation can change metadata without changing configuration content.
+- A later retest persisted ten original file fingerprints and verified their
+  content/security metadata, but its private wrapper omitted native
+  `log-config.json` regeneration from the permitted timestamp classification.
+  It stopped verification despite unchanged bytes, ownership, permissions, file
+  type, links and inode for that file.
+- Investigation compared generated YAML semantics, allowing only the confirmed
+  permutation of two independent host receivers. Unknown settings, duplicate
+  receivers, processor reordering and other semantic changes were not accepted.
+  The retest's generated TOML/YAML were byte-identical to its own baseline.
+- The subsequent 225-check offline review exercised corrected file-by-file
+  classifications and the complete verification path. Missing historical lock,
+  directory, timing and final-observation evidence remained missing; synthetic
+  completion data was labelled and used only in offline fixtures.
+- The final authorized attempt aborted during preflight before stopping the
+  Agent. Its website inventory predicate rejected existing package-owned
+  directories/symlinks omitted from the file-only offline fixture. No recovery
+  occurred in that attempt, and the full held-lock observation was not reached.
+
+The outstanding read-only EC2/EBS checks were subsequently completed during the
+alarm-test preflight, with unchanged identities/configuration and healthy
+services. That closes the infrastructure query gap, not the incomplete recovery
+verification. All previous evidence is preserved, and this testing phase is
+closed without further interruptions or wrapper corrections. No complete live
+Agent recovery pass, recovery-time guarantee, or proof of lossless telemetry is
+claimed.
+
+## CloudWatch alarm-to-email notification
+
+On November 25, 2026, preflight established fresh healthy CPU observations and
+an evaluated OK alarm baseline, enabled actions, the intended SNS topic and one
+confirmed email subscription. The operator performed exactly one labelled
+**simulated** ALARM transition with `SetAlarmState` at 4:09:23 p.m. EST. Alarm
+history recorded a successful SNS action immediately afterward. The alarm
+returned naturally to evaluated OK at 4:10:49 p.m., approximately 86 seconds later.
+The operator subsequently confirmed receipt of the matching notification email.
+This confirmation supplements the preserved execution report, which recorded
+receipt as pending when it was written; that historical report is unchanged.
+
+No artificial CPU load, direct SNS publish, repeated transition or alarm
+configuration change was used. This verifies the alarm action, SNS path and
+observed email receipt for that test. It does not test a genuine 80% CPU breach,
+establish a notification-delivery SLA, or prove future mailbox delivery.
+Infrastructure, Terraform state, the subscription configuration and protected
+source hashes remained intact. No email address, message body or unsubscribe
+link is published.
+
+## Isolated Linux harness
+
+The harness runs offline simulations, not live server tests. Bare `mktemp`, used
+by unchanged server verification, requires `/tmp` when `TMPDIR` is unset. A failed
+initial hosted run exposed its absence from the disposable root. The corrected
+fixture creates/resets root-owned `/tmp` and `/var/tmp` with mode 1777. Two Linux
+readiness guards reproduce the omission and verify safe bare `mktemp` behavior.
 
 ## Isolation and execution
 
@@ -19,8 +133,8 @@ bash scripts/ci/validate.sh
 It runs the existing security tests and portable harness guards, then invokes
 `python3 -B tests/recovery_runner.py`. On Linux, the latter requires the existing
 system Python, core utilities, `ldd`, `unshare`, and passwordless `sudo` (unless
-already root). Hosted Ubuntu is the intended execution environment; its first
-run must verify these prerequisites and namespace support. Missing
+already root). Hosted Ubuntu verified these prerequisites and namespace support.
+Every execution checks them again. Missing
 privileges, tools, or namespace support fail CI; Linux never silently skips the
 recovery suite. No packages, distributions, images, or dependencies are installed.
 On other platforms the runner explicitly reports that Linux cases did not execute.
@@ -103,18 +217,21 @@ Before recursive cleanup, the supervisor revalidates the exact absolute path,
 workspace containment, regular single-link marker, and unique nonce. A mismatched
 identity stops cleanup. It never accepts an arbitrary deletion directory.
 
-## Evidence and remaining acceptance
+## Evidence boundaries and future operations
 
 Local checks can establish syntax, source hygiene, release integrity, portable
 guard behavior, regression results, and static tooling results. They cannot
-establish Linux recovery success on Windows. The corrected hosted run must execute
-all 81 ordinary tests, 31 recovery cases and two Linux readiness guards:
-114 total, zero skips. This retains all 110 original tests and adds four guards.
+establish Linux recovery success on Windows. The corrected hosted run executed
+81 ordinary tests, 31 recovery cases and two Linux readiness guards:
+114 total, zero skips. The 225 private offline checks are a separate result and
+must not be added to that hosted total or described as reproducible repository CI.
 
-Even a successful Linux run demonstrates simulated recovery with command
-substitutes. Actual Amazon Linux Nginx/Agent activation, live rollback, notification
-delivery, and operator recovery remain separately approved live tests. The EC2
-instance stays stopped during local implementation.
+The Linux harness demonstrates simulated recovery with command substitutes.
+The live outcomes and Agent limitations are documented above. Cancellation,
+ambiguous timeout, failed automatic recovery, latch clearance, and concurrent
+deployment failures were exercised in isolation, not deliberately on the instance.
+Any additional live operations require separate scope and approval. This record
+does not authorize repeating recovery tests or publishing notifications.
 
 Public evidence should include source commit, case name, simulated/live label,
 exit code, restoration/permission/latch assertions, and durations. Exclude raw

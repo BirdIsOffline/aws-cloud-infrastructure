@@ -1,15 +1,23 @@
 # Server deployment runbook
 
+During CI-only publication preparation the instance is stopped and GitHub
+delivery is disabled. These retained operator procedures require separate
+authorization; they do not reactivate federation or authorize an instance start.
+
 The [isolated recovery harness](recovery-testing.md) exercises failure and rollback
 paths with disposable Linux files and command substitutes. It never connects to
-the server. Passing those simulations does not establish live recovery; the live
-tests below still require separate approval.
+the server. Passing those simulations alone does not establish live recovery.
+The [testing record](recovery-testing.md) documents completed live outcomes and
+the closed Agent-verification limitations. The commands below are operational
+procedures and require separate authorization before use.
 
 Controlled deployment and strict configuration idempotency testing are complete.
 The corrected scripts preserved content, metadata, packages, services, and backup
-inventory during the verified repeat run. Formal failure and rollback/recovery
-tests remain pending. Deployment, package transactions, configuration activation, and
-rollback require approval before executing them against the lab server.
+inventory during the verified repeat run. Live website restoration and the
+simulated alarm-to-email test passed; live Agent recovery did not complete full
+verification despite restored monitoring health. Deployment, package transactions,
+configuration activation, and rollback require approval before executing them
+against the lab server.
 
 ## Preconditions
 
@@ -30,7 +38,10 @@ rollback require approval before executing them against the lab server.
    command is part of deployment.
 6. Run one deployment at a time. Do not run another provisioning tool against the
    same files during deployment or rollback; these scripts do not provide a
-   cross-process deployment lock.
+   cross-process deployment lock. The restricted SSM executor supplies that lock;
+   separately authorized operator work must acquire the same lock and check the
+   persistent failure latch before using these scripts. Check command/child
+   status as well as lock availability after interrupted execution.
 
 All following examples run **on the Linux server only after approval**:
 
@@ -149,6 +160,7 @@ monitoring contract, homepage structure/content, source hygiene, LF endings, and
 Terraform file integrity. Git Bash on Windows is not Amazon Linux: it cannot
 validate systemd, Nginx or Agent binaries, RPM/DNF behavior, AWS ingestion, Linux
 ownership/atomic filesystem operations, or real rollback. Controlled Linux tests
-verified deployment and strict idempotency; formal recovery testing remains pending.
+verified deployment and strict idempotency. Recovery outcomes are maintained in
+the [testing record](recovery-testing.md), rather than inferred from these checks.
 ShellCheck is mandatory in the CI entry point; it is a development dependency,
 not a required package on the deployment target.

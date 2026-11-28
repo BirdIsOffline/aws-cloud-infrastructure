@@ -1,66 +1,41 @@
 # Security
 
-## Scope and reporting
+## Reporting
 
-This repository is an AWS lab with a public CI-only operating mode. Historical
-live delivery is retained as engineering evidence, not an enabled service.
-No availability, lossless telemetry or disaster-recovery guarantee is provided.
+Use **Report a vulnerability** on GitHub's Security tab. Do not include
+credentials, private identifiers, state, raw logs or exploit details in public
+issues. If private reporting is unavailable, request a private contact route
+without posting sensitive details. This lab has no response-time commitment.
 
-Do not put credentials, account/resource identifiers, Terraform state, raw logs
-or exploit details in public issues. Use GitHub's **Report a vulnerability** action
-on the repository Security tab. If private reporting is unavailable, open only a
-nonsensitive issue requesting a private contact route. No response-time commitment
-is made.
+## Repository controls
 
-## Verified repository controls
+The last publication checks verified:
 
-The November 28, 2026 audit baseline covered commit
-`a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`. The completed hardening rollout at
-`7cd4faf5e8fc9af0531e6e372ce1329cc41350a2` subsequently verified these GitHub controls:
+- Pull requests, both CI checks, up-to-date branches and resolved conversations
+  on main; administrator enforcement; blocked force pushes and branch deletion.
+- Zero required approving reviewers for solo maintenance. This is not independent
+  two-person review.
+- An exact Checkout-only action allowlist, full-length SHA enforcement, read-only
+  tokens, no workflow PR approval, and approval for all external contributors.
+- Secret scanning, push protection, dependency graph, Dependabot alerts and private
+  vulnerability reporting. Automatic dependency/security updates remain disabled.
 
-- Main requires pull requests, both CI jobs, up-to-date branches and resolved
-  conversations. Protections apply to administrators; force pushes and deletion
-  are blocked. Zero independent reviewers are required for solo maintenance.
-- Actions accept only the exact Checkout 7.0.1 pin in the [CI guide](docs/ci-cd.md#repository-hygiene-and-action-pins),
-  with full-length SHA enforcement. Default tokens are read-only, workflow PR
-  creation/approval is disabled, and all external contributors require workflow approval.
-- Secret scanning and push protection are enabled. They supplement, rather than
-  replace, local source/history and retained-log privacy checks.
-- Both CD workflows are disabled. The published Terraform role trust denies
-  federation; its attached policy explicitly denies deployment-session permissions.
-  CI requests no AWS authentication or OIDC token and does not deploy infrastructure.
+Both CD workflows remain disabled. Published Terraform denies deployment-role
+federation and all deployment-session service permissions. CI requests no AWS
+credentials or OIDC token. See [CI security details](docs/ci-cd.md).
 
-These GitHub controls were read live during that rollout, not re-queried for the
-local rollback correction. AWS was not queried: published Terraform,
-local state or previous reports cannot establish current live IAM, sessions,
-instance health or drift. Re-enabling delivery requires separate review.
+## Remaining limits
 
-## Open security work
+The lab uses HTTP without TLS, broad adopted instance permissions/outbound access,
+local Terraform state and on-instance backups. The deployment executor runs as
+root; its boundary does not sandbox the instance role or trusted system tools.
 
-The original audit found dependency graph, Dependabot alerts and private reporting
-disabled. The completed rollout enabled these free features, verified zero open
-dependency alerts, and kept automatic dependency/security updates disabled.
-Alert coverage does not replace bundle-aware reviews: SHA-pinned actions,
-bundled npm code and Terraform Go modules may not produce Dependabot alerts.
+Known dependency findings and their workflow applicability are documented in the
+[dependency review](docs/ci-cd.md#dependency-review-and-open-findings).
+Passing tests or having no Dependabot alerts does not establish complete coverage.
 
-The completed hardening replaced Setup Terraform with an installer that requires the
-pinned HashiCorp signing-key fingerprint, a valid signed manifest and the exact
-Terraform 1.17.2 Linux archive hash before extraction. No verification fallback is
-allowed. Checkout 7.0.1 and AWS Credentials 6.3.1 use reviewed immutable pins; the
-rollout verified a Checkout-only allowlist. Checkout retains response-handling DoS
-advisories, and Terraform includes two medium OpenTelemetry findings whose paths
-CI does not enable. The obsolete OpenPGP warning does not match Terraform's
-reviewed implementation. See the [dependency review](docs/ci-cd.md#dependency-review-and-open-findings)
-for applicability, validation requirements and the Checkout-only allowlist.
-Pins and passing tests do not establish vulnerability-free operation.
-
-The lab retains HTTP without TLS, broad adopted instance permissions and outbound
-access, local Terraform state and on-instance backups. The executor runs as root.
-Live Agent recovery verification remains incomplete; isolated tests do not close
-that gap. See the [security boundary](docs/authenticated-delivery.md) and
-[recovery record](docs/recovery-testing.md).
-
-The corrected monitoring rollback release passed hosted Linux regression tests.
-Its revised release contract has not replaced the live SSM document or repeated
-live idempotency or recovery tests. CI-only operation and both published
-deployment denies are unchanged.
+The repository's corrected monitoring release remains undeployed. Complete live
+Agent recovery verification is still incomplete; see the
+[testing record](docs/recovery-testing.md). Publication checks did not authenticate
+to AWS: source and stored evidence do not independently prove current live IAM
+state, instance health or drift. Re-enabling delivery needs a separate review.

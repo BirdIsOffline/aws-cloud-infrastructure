@@ -2,156 +2,107 @@
 
 [![CI](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/workflows/ci.yml)
 
-An AWS lab demonstrating Terraform adoption without resource recreation, Linux
-automation and OIDC-authenticated delivery through a restricted Systems Manager executor.
+A hands-on AWS project covering networking, Linux, monitoring, Terraform and
+automation. Manually tested infrastructure was adopted into Terraform without
+recreation. Bash scripts made server configuration repeatable; GitHub Actions
+provided CI and restricted OIDC-authenticated delivery.
 
-**Current mode: CI only.** CI remains active; both delivery workflows are disabled.
-The deployment role denies federation, and its attached policy denies service
-permissions for previously issued sessions. EC2 is stopped. Live deployment,
-availability, telemetry, and recovery results below are historical tests, not
-current service-health claims. Restoring delivery requires a separate security review.
+**Current operation is CI only.** The instance is stopped, both deployment
+workflows are disabled, and the deployment role has federation and session
+permission denies. The live results below describe completed tests, not a
+currently available website.
 
 ## Architecture
 
-![AWS architecture: one EC2 workload across a four-subnet VPC, restricted OIDC and SSM delivery, CloudWatch monitoring and separate Terraform management](docs/diagrams/architecture.svg)
+![AWS architecture: VPC, EC2, monitoring, restricted delivery and separate Terraform management](docs/diagrams/architecture.svg)
 
-[Full-size SVG](docs/diagrams/architecture.svg) ·
+[Full-size diagram](docs/diagrams/architecture.svg) ·
 [Editable draw.io source](docs/diagrams/architecture.drawio) ·
-[Diagram notes and attribution](docs/diagrams/README.md)
+[Diagram notes and AWS icon attribution](docs/diagrams/README.md)
 
-The diagram includes the implemented delivery path, which is currently disabled.
+- **Networking:** a custom `10.20.0.0/16` VPC in `us-east-2`, with two public and
+  two private subnets across two Availability Zones. Public subnets route through
+  an internet gateway; private subnets have local routing only.
+- **Workload:** one Amazon Linux 2023 `t3.micro` running Nginx in a public subnet,
+  with an encrypted 8 GiB gp3 root volume. The other three subnets are unused.
+- **Access:** Systems Manager instead of inbound SSH, an EC2 service role,
+  required IMDSv2, termination protection and HTTP-only inbound access.
+- **Monitoring:** native EC2 metrics, Agent memory/disk metrics and Nginx logs,
+  a four-widget CloudWatch dashboard, CPU alarm and SNS email notification.
 
-- **Network:** `us-east-2`, custom `10.20.0.0/16` VPC, two public and two private
-  subnets across two Availability Zones. Public routing uses an internet gateway;
-  private routing is local only. There is no NAT gateway.
-- **Workload:** one Amazon Linux 2023 `t3.micro` instance running Nginx in a public
-  subnet, with encrypted 8 GiB gp3 root storage. The other three subnets have no
-  application workloads.
-- **Administration:** Systems Manager replaces inbound SSH and key-pair access.
-  An EC2 IAM role supplies Systems Manager and CloudWatch permissions.
-- **Observability:** the CloudWatch Agent publishes memory/disk metrics and Nginx
-  logs. A four-widget dashboard and CPU alarm support monitoring; SNS delivers
-  alarm notifications to a confirmed, externally managed email subscription.
-
-Terraform owns infrastructure. Four Bash scripts manage selected server
-configuration and website files. Delivery neither applies Terraform nor uses
-provisioners or user data to deploy the application.
+There is no load balancer, NAT gateway or application failover. Terraform manages
+AWS resources; server scripts manage selected operating-system files. Application
+deployment does not run Terraform or use user-data provisioning.
 
 ## Website preview
 
-[![Local preview of the previously approved website release](docs/assets/website-local-preview.svg)](docs/assets/website-local-preview.svg)
+[![Local browser preview of the approved website](docs/assets/website-local-preview.svg)](docs/assets/website-local-preview.svg)
 
-*Local browser preview, not a running EC2 instance. Status labels and CI/CD wording
-reflect the previously approved website release.*
+*Local preview of the previously deployed website release, not a running EC2
+instance. Its status label and earlier CI/CD wording are part of that snapshot.*
 
-## Terraform implementation
+## Implementation
 
-The first 27 resources were discovered, defined, and imported in dependency order.
-Refreshed plans verified parity without infrastructure changes. Six delivery-security
-resources were then provisioned from a reviewed saved plan, bringing management
-to **33 resources and four separate read-only data sources**.
+Terraform manages **33 resources and four data sources**:
 
-| Category | Resources | Scope |
+| Category | Resources | Contents |
 | --- | ---: | --- |
-| Networking | 16 | VPC, four subnets, gateway, route tables, route, associations, security group and rules |
-| Compute and identity | 5 | EC2/root storage, instance role, two policy attachments and instance profile |
+| Networking | 16 | VPC, subnets, gateway, route tables, route, associations, security group and rules |
+| Compute and identity | 5 | EC2 with inline root storage, role, two policy attachments and instance profile |
 | Monitoring | 6 | Dashboard, alarm, two log groups, SNS topic and separate policy |
-| Delivery security | 6 | OIDC provider, role, policy, attachment, permissions boundary and SSM document |
+| Delivery security | 6 | OIDC provider, role, policy, attachment, boundary and SSM document |
 
-Stable map keys preserve import addresses; references replace hardcoded IDs.
-The AMI resolves an exact Amazon-owned image name, not the latest release.
-The [Terraform reference](terraform/README.md) records every address and adopted setting.
+The original 27 resources were imported with zero-change parity checks; six
+delivery resources were added later. The [Terraform reference](terraform/README.md)
+lists addresses, settings and the stopped-instance public-IP lifecycle exception.
 
-State, backups and private identity inputs remain outside Git. A checkout alone
-cannot safely manage the adopted environment. With AWS provider 6.74.0, stopping
-EC2 caused public-IP observation drift and a replacement proposal. A narrow
-[lifecycle exception](terraform/README.md#public-ipv4-lifecycle-exception) ignores only
-`associate_public_ip_address` updates while retaining explicit `true` launch intent
-and `prevent_destroy`. Public-IP drift therefore needs a separate check.
+Four scripts handle prerequisites, website deployment, monitoring and verification.
+They validate candidates, keep private backups and avoid unnecessary writes or
+restarts. The executor pins seven inputs and adds locking, recovery records and a
+persistent failure latch. [Server setup](docs/server-configuration.md),
+[operations](docs/deployment-runbook.md) and the
+[delivery design](docs/authenticated-delivery.md) explain those boundaries.
 
-## Security and automation
+## Testing and results
 
-The instance requires IMDSv2 and has termination protection. Terraform destruction
-guards protect the VPC, EC2 and selected delivery resources while their definitions
-remain present. The web security group permits public HTTP, no inbound SSH, and
-unrestricted outbound IPv4. TLS is not implemented.
+[Main CI run 46129889618](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46129889618)
+passed **162 Python tests and one mocked Terraform test**, with zero failures or
+skips. Checks include Bash/ShellCheck, source hygiene, configuration contracts,
+HTML, release integrity, isolated Linux recovery, signed Terraform installation
+and locked provider validation. CI uses read-only tokens and has no AWS credentials.
 
-Historically, OIDC trust required eight exact conditions covering the STS audience,
-immutable repository/owner identity, allowed actor, main branch and workflow
-references. The role and boundary restricted command submission to one instance
-and one dedicated document. Current explicit denies override those retained grants.
-No permanent AWS access keys were used for delivery.
+Completed live tests demonstrated OIDC/STS authentication, one restricted SSM
+execution, four successful scripts, strict configuration idempotency, website
+restoration, HTTP availability and fresh monitoring. One labelled **simulated**
+ALARM transition produced a confirmed SNS email; it was not a real CPU breach.
 
-The root-running executor pins seven release files, including configuration,
-and rejects modified hashes, unsafe paths, links, extra files and oversized bundles.
-Private staging, server locking, recovery records and a persistent failure latch
-constrain execution. Root tools, package sources and repository administrators
-remain trusted. Manual dispatch is authorization, not independent reviewer approval.
+Agent restoration recovered monitoring health but **did not pass complete live
+recovery verification**. The separate 225 private offline checks and historical
+114-test baseline do not close that gap. The corrected rollback script now in the
+repository passed hosted tests but **has not been deployed to AWS**. The
+[testing record](docs/recovery-testing.md) explains the evidence and limitations.
 
-| Script | Responsibility |
-| --- | --- |
-| `bootstrap.sh` | Install missing prerequisites and enable services without blanket upgrades |
-| `deploy-website.sh` | Validate, stage and atomically deploy website/Nginx configuration with private backups and rollback |
-| `configure-monitoring.sh` | Validate the Agent contract, activate only when needed and support recovery |
-| `verify-server.sh` | Check services, Nginx syntax, HTTP and expected content |
+## Working with the repository
 
-Delivery required exact-commit authorization and successful CI before credentials,
-then verified the target/document and submitted one bounded SSM execution.
-Ambiguous submission or failed verification never triggered automatic redeployment.
-See the [security model](docs/authenticated-delivery.md) and
-[server baseline](docs/server-configuration.md) for implementation details.
+Stack: Terraform 1.17.2, AWS provider 6.74.0, AWS CLI v2, Amazon Linux 2023,
+Nginx, systemd, CloudWatch Agent, Bash, Python and GitHub Actions.
 
-## Verified results
+- `terraform/`: infrastructure and mocked tests.
+- `scripts/`, `config/`, `website/`: automation, pinned release inputs and homepage.
+- `tests/`: authorization, artifact-verification and recovery tests.
+- `docs/`: [CI](docs/ci-cd.md), [manual delivery](docs/manual-deployment.md),
+  configuration, recovery and diagrams.
 
-[Hosted correction CI run 46129410785](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46129410785)
-passed both jobs for corrected source commit `90c34c6db41052706762eedfafd045ef0ce9dab9`:
-**162 Python tests plus one mocked Terraform test**, with zero failures or skips.
-CI checks source hygiene, Bash/ShellCheck, JSON/monitoring contracts, HTML,
-release integrity, isolated recovery and locked Terraform validation. Actions use
-full SHA pins and read-only permissions; CI has no AWS authentication or deployment privileges.
+Follow the CI guide for local validation. A checkout lacks the private Terraform
+state and deployment inputs needed to operate the adopted environment.
 
-The [corrected monitoring rollback release](docs/authenticated-delivery.md#monitoring-rollback-release)
-passed hosted regression tests. Its revised script and SSM contract have **not**
-been deployed to AWS; historical live results below apply to the earlier release.
+## Limits and costs
 
-Historical live verification demonstrated:
+HTTP has no TLS. Instance permissions and outbound access remain broad. State and
+recovery copies are local; there is no off-instance backup or demonstrated
+recovery from total instance loss. Root storage is deleted on termination.
 
-- OIDC/STS authentication, restricted SSM execution and four successful script exits.
-- Strict configuration idempotency, including unchanged compliant-file ctime,
-  package versions, service identities and backup inventory.
-- Website rollback restoring exact content and security metadata without an
-  unnecessary service restart or reload.
-- Fresh memory/disk metrics, access-group log ingestion, expected streams and
-  seven-day retention. Metrics use a 300-second collection interval.
-- One labelled simulated alarm transition, successful SNS action and confirmed
-  email receipt. This did **not** test a genuine CPU threshold breach.
-
-Agent restoration recovered healthy monitoring but **did not pass complete live
-recovery verification**. The historical 114-test hosted recovery baseline and
-225 separate private offline checks are distinct evidence; neither closes that gap.
-The [testing record](docs/recovery-testing.md) preserves failures, timing and limitations.
-
-## Repository and operation
-
-**Stack:** Terraform 1.17.2, AWS provider 6.74.0, AWS CLI v2, Amazon Linux 2023,
-Nginx, systemd, CloudWatch Agent, Bash, Python, Git and GitHub Actions.
-
-`terraform/` holds infrastructure; `scripts/` holds server, CI, delivery and executor
-code. `config/` holds settings and release contracts; `website/` holds the pinned
-homepage; `tests/` contains security and recovery tests.
-
-Use the [CI guide](docs/ci-cd.md) for offline validation and Linux isolation
-prerequisites. [Delivery](docs/manual-deployment.md) and
-[server recovery](docs/deployment-runbook.md) runbooks describe procedures, not
-permission to execute them.
-
-## Costs and limitations
-
-Costs include compute, storage, public IPv4, CloudWatch and notifications; stopping
-EC2 leaves storage charges. No Free Tier coverage is assumed.
-
-There is no load balancer, failover tier, remote Terraform backend, off-instance
-recovery backup or demonstrated recovery from total instance loss. Root storage
-is deleted on termination. Adopted broad instance policies, outbound access and
-SNS permissions need separate hardening review. Isolated failure tests do not
-establish live disaster recovery or an RTO/RPO guarantee.
+Compute, EBS, public IPv4, CloudWatch and notifications can incur charges; stopped
+compute still retains storage costs. No Free Tier coverage is assumed. See
+[SECURITY.md](SECURITY.md) for reporting, repository protections and remaining
+security work.

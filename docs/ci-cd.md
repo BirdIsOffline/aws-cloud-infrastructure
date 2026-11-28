@@ -8,7 +8,7 @@ previously verified implementation. No deployment is authorized by this guide.
 ## Isolated recovery validation
 
 The source job also runs the offline Linux recovery harness through the existing
-validation entry point. Its 31 recovery cases and two readiness guards use unchanged
+validation entry point. Its hosted baseline of 31 recovery cases and two readiness guards uses unchanged
 production code inside an ephemeral chroot with isolated network/PID/mount namespaces and no credentials or
 host mounts. Missing Linux isolation support fails CI. Thirteen additional portable
 guard tests run with the existing regression suite. See
@@ -19,11 +19,13 @@ The published recovery baseline passed all 114 tests with zero skips: 81 ordinar
 recorded results and limits; the separate 225 private offline checks are not
 part of this CI count.
 
-Latest verified hosted CI passed **121 Python tests and one mocked Terraform
-test**, with zero skips: 88 ordinary Python tests, 31 recovery cases, two Linux
-readiness guards, and a separate mocked Terraform run with seven assertions.
-[CI run 46119166117](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46119166117)
-records that result for commit `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`.
+Latest verified hosted CI passed **140 Python tests and one mocked Terraform
+test**, with zero failures or skips: 107 ordinary Python tests, 31 recovery cases,
+two Linux readiness guards, and a separate mocked Terraform run with seven assertions.
+[CI run 46124737536](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46124737536)
+records that result for commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`. The
+proposed rollback correction adds 22 tests, for a pending 162-test suite; see the
+[recovery coverage](recovery-testing.md#proposed-rollback-regression-coverage).
 
 ## Current scope
 
@@ -73,8 +75,9 @@ The reusable entry point runs:
   tests, including protections for all seven pinned files. They do not perform
   privileged deployment on the host; the recovery runner separately executes
   production code inside isolation. Native Windows skips real POSIX metadata
-  tests; those executed successfully on the hosted Linux runner. The new real-GPG
-  fixture test also requires Linux and must pass during the next hosted validation.
+  tests; those executed successfully on the hosted Linux runner. The real-GPG
+  fixture test also passed on Linux in the verified hosted run above; it remains
+  mandatory for future revisions.
 
 Ubuntu runner images provide Bash, Python 3, Git, GPG, and ShellCheck. Their installed
 versions can change with image updates; no package installation or upgrade is part
@@ -143,14 +146,15 @@ scans and operator review without assuming paid private-repository protections.
 Never commit runtime SSM output, email subscription details or recovery archives.
 
 External actions are pinned to full commit SHAs verified against official
-repository tag refs. The following table records the published baseline, not the
-replacement pins used by this hardening change:
+repository tag refs. The current published pins, verified during the completed hardening rollout, are:
 
 | Action | Release | Commit |
 | --- | --- | --- |
-| [actions/checkout](https://github.com/actions/checkout/releases/tag/v6.1.0) | v6.1.0 | `d23441a48e516b6c34aea4fa41551a30e30af803` |
-| [hashicorp/setup-terraform](https://github.com/hashicorp/setup-terraform/releases/tag/v4.0.1) | v4.0.1 | `dfe3c3f87815947d99a8997f908cb6525fc44e9e` |
-| [aws-actions/configure-aws-credentials](https://github.com/aws-actions/configure-aws-credentials/releases/tag/v6.3.0) (CD only) | v6.3.0 | `e1253824e5c10ff9df46874f81ed3ec929e19cfd` |
+| [actions/checkout](https://github.com/actions/checkout/releases/tag/v7.0.1) | v7.0.1 | `3d3c42e5aac5ba805825da76410c181273ba90b1` |
+| [aws-actions/configure-aws-credentials](https://github.com/aws-actions/configure-aws-credentials/releases/tag/v6.3.1) (disabled CD only; excluded from allowlist) | v6.3.1 | `45666896f5d8e0f10ae255413f3a4cdd03bdc8f5` |
+
+Setup Terraform was removed; the signature-verified official archive installer
+replaces it. Checkout is the only action allowed by repository policy.
 
 Update pins through reviewed changes after verifying the new commit belongs to the
 official repository and reviewing release notes. Local workflow validation uses
@@ -163,16 +167,18 @@ remain disabled and both AWS deployment denial controls remain in force. The
 retained CD implementation still requires a private original repository; changing
 visibility does not adapt that gate or authorize delivery.
 
-Repository policy requires full-length action SHAs. The two approved CI actions
-are `actions/checkout` and `hashicorp/setup-terraform` at the exact pins above.
-The verified allowlist permits only those two pins, with broad
+Repository policy requires full-length action SHAs. The verified final allowlist
+permits only the exact Checkout 7.0.1 pin above, with broad
 GitHub-owned and verified-creator allowances disabled. The retained CD credential
 action is not part of the CI allowlist. Keep default workflow tokens read-only,
 workflow PR creation/approval disabled, and fork secrets/write tokens unavailable.
 Require maintainer approval for all external-contributor workflows where supported.
 
-The following controls were verified through read-only GitHub settings queries on
-November 28, 2026 for commit `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`:
+The November 28, 2026 audit at `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`
+found Checkout 6.1.0 and Setup Terraform 4.0.1 allowed, with dependency graph,
+Dependabot alerts and private reporting disabled. The completed rollout at
+`7cd4faf5e8fc9af0531e6e372ce1329cc41350a2` verified the updated controls below.
+These recorded observations were not re-queried for the local rollback correction:
 
 | Control | Verified state |
 | --- | --- |
@@ -180,13 +186,13 @@ November 28, 2026 for commit `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`:
 | Administrator enforcement | Enabled; no PR bypass users, teams or apps configured |
 | Force pushes and branch deletion | Blocked |
 | Reviewers | Zero required approving reviewers; solo maintenance is not independent two-person review |
-| Actions | Exact two CI pins above; broad GitHub-owned/verified-creator allowances disabled; full-length SHA enforcement enabled |
+| Actions | Exact Checkout 7.0.1 pin only; broad GitHub-owned/verified-creator allowances disabled; full-length SHA enforcement enabled |
 | Workflow tokens | Read-only defaults; workflow PR creation/approval disabled |
 | External contributors | Workflow approval required for all external contributors |
 | Secret scanning and push protection | Enabled; no open secret-scanning alerts returned |
-| Dependency graph | Disabled in the public dependency UI; SBOM endpoint unavailable |
-| Dependabot alerts | Disabled, as explicitly reported by GitHub's alert API |
-| Private vulnerability reporting | Disabled |
+| Dependency graph | Enabled; SBOM contained the repository and two current action pins, with no Setup Terraform |
+| Dependabot alerts | Enabled; zero open alerts returned; automatic dependency/security updates remain disabled |
+| Private vulnerability reporting | Enabled |
 | CD workflows | Both disabled; CI active |
 
 These are repository observations, not independently verified live AWS state.
@@ -194,7 +200,7 @@ Published Terraform retains deny-only federation and an explicit deny-all in the
 attached deployment policy. Neither source inspection nor earlier state snapshots
 prove those controls are still applied in AWS. This review used no AWS credentials.
 
-Source and Git-history privacy checks found no unintended sensitive values across
+The original audit's source and Git-history privacy checks found no unintended sensitive values across
 102 committed blob objects. Twelve retained log archives from 14 run records,
 74 log members and 26 check outputs/annotation sets were reviewed. The previously
 cleaned exposing archive remains unavailable and its run record is intact. The
@@ -215,14 +221,14 @@ This is a static applicability review, not a proof that every runtime path is sa
 | Component | Audited baseline | Hardening change | Remaining findings |
 | --- | --- | --- | --- |
 | Checkout | 6.1.0 | 7.0.1, `3d3c42e5aac5ba805825da76410c181273ba90b1` | Undici 6.27.0 still has 11 advisory matches, including high-severity network-response DoS |
-| Setup Terraform | 4.0.1 | Removed; verified official archive installer | Its Axios, redirect, multipart and Undici bundles no longer execute in the proposed CI |
+| Setup Terraform | 4.0.1 | Removed; verified official archive installer | Its Axios, redirect, multipart and Undici bundles no longer execute in CI |
 | AWS Credentials, disabled CD only | 6.3.0 | 6.3.1, `45666896f5d8e0f10ae255413f3a4cdd03bdc8f5` | Zero current npm audit matches; this is not a vulnerability-free guarantee |
 | Terraform CLI | 1.17.2 | Unchanged; latest stable | Two medium OpenTelemetry advisories; OpenPGP warning not applicable to the reviewed implementation |
 | AWS provider | 6.74.0 | Unchanged; latest stable | No matches in the checked declared-module dataset; not a complete binary/standard-library audit |
 
 The audit recorded the **baseline** Checkout/Setup Terraform allowlist above.
-The rollout below narrows it to the replacement Checkout pin after successful CI;
-repository settings must be verified separately from source changes. Both CD
+The completed rollout narrowed it to the replacement Checkout pin after successful
+PR and main CI; effective repository settings were verified separately from source changes. Both CD
 workflows remain disabled, and the credential action is excluded from the CI
 allowlist. These repository observations do not verify live AWS controls.
 
@@ -250,7 +256,7 @@ allowlist. These repository observations do not verify live AWS controls.
   disabled credential persistence and no AWS authentication constrain impact.
   The current allowlist and Node 24 hosted compatibility must still be reviewed.
 - **Setup Terraform:** 4.0.1 remains the latest stable upstream action but its
-  affected Axios/redirect/form/Undici bundles are removed from the proposed CI.
+  affected Axios/redirect/form/Undici bundles are removed from CI.
   Replacing the action also closes its installation path's missing explicit
   archive-verification step. No fork, transitive override or new package dependency
   is used; the replacement uses Ubuntu's Python standard library and GPG.
@@ -290,15 +296,16 @@ no CVSS severity. Provider 6.74.0 has newer OpenTelemetry 1.47.0/x/crypto 0.59.0
 A complete Go standard-library and symbol-level vulnerability scan remains outside
 this review; Linux binary execution was unavailable locally.
 
-All proposed action SHAs resolve to official stable tags; Checkout and AWS
+All reviewed action SHAs resolve to official stable tags; Checkout and AWS
 Credentials commits have GitHub-verified signatures. Downloaded action files
 matched official Git tree blob hashes. Locally recorded archive SHA-256 values
 are evidence hashes, not signed upstream attestations or reproducible builds.
 Official Windows/Linux Terraform and provider archive hashes matched HashiCorp's
 manifests; provider hashes also matched the unchanged lock, and installed Windows
 binaries matched their archives. Local detached-signature execution was unavailable
-because the installed GPG runtime failed to start. Successful production GPG
-verification remains a mandatory hosted gate, not an assumed local result.
+because the installed GPG runtime failed to start. The verified hosted run above subsequently passed real GPG checks and the
+production installer; local GPG execution remains unavailable. Signature and hash
+verification remain mandatory hosted gates for future revisions.
 
 ### Verified Terraform installation
 
@@ -343,13 +350,19 @@ missing/duplicate/malformed checksum entries, corrupted archives, unsafe entries
 download failures and verification-before-extraction/path-export ordering. Public
 key/manifest/signature fixtures enable offline Linux GPG acceptance and tampering
 checks, including actual-signer expiration at a synthetic future verification time
-inside the negative test only. They contain no private keys. Actual download, signature verification and
-Linux execution must also pass in the Terraform job during the next approved PR.
-The proposed complete hosted total is **140 Python tests plus one mocked Terraform
-test**, all required to pass with zero skips. The latest published 121-test result
-above remains historical evidence until that run completes.
+inside the negative test only. They contain no private keys. Actual download,
+signature and archive checksum verification, Linux execution, locked initialization
+and Terraform validation passed in the main run above. All **140 Python tests
+plus one mocked Terraform test** passed with zero skips. The earlier 121-test
+result remains historical evidence; the local rollback revision still needs its
+own complete hosted validation.
 
 ### Safe rollout and alerting
+
+This sequence records the completed dependency-hardening rollout. The original
+failed run was preserved, the narrow GPG correction passed protected PR/main CI,
+the final allowlist was reduced to Checkout alone, and the free reporting/alerting
+features were enabled. Future changes require a fresh review of the same gates.
 
 1. With separate settings approval, temporarily add only
    `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` beside the two
@@ -372,7 +385,7 @@ above remains historical evidence until that run completes.
    module; retain periodic bundle-aware review.
 
 Residual Checkout and Terraform findings remain open for upstream remediation.
-This proposal changes no live AWS controls; local validation is not hosted or
+The completed dependency rollout changed no live AWS controls; local validation is not hosted or
 live-AWS verification.
 
 ## Authenticated manual delivery

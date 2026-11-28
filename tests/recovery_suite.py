@@ -276,7 +276,10 @@ class Recovery(unittest.TestCase):
         self.assertFalse(any(name.startswith(("AWS_", "GH_", "GITHUB_")) for name in os.environ))
 
     def script(self, name, *args):
-        process = subprocess.Popen(["/usr/bin/bash", "/project/scripts/" + name, *args], env=os.environ.copy(),
+        environment = os.environ.copy()
+        if Path("/fixture/bin").is_dir():
+            environment["PATH"] = "/fixture/bin:" + environment["PATH"]
+        process = subprocess.Popen(["/usr/bin/bash", "/project/scripts/" + name, *args], env=environment,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
         try:
             output, errors = process.communicate(timeout=20)
@@ -402,6 +405,113 @@ class Recovery(unittest.TestCase):
         backup = next(Path("/var/backups/aws-portfolio-lab/monitoring").iterdir())
         self.assertEqual(json.loads((backup / "amazon-cloudwatch-agent.json").read_text()), before)
         self.assertFalse(state()["active"]["amazon-cloudwatch-agent"])
+        self.assert_backups_private()
+
+    def no_monitoring_predecessor(self, **faults):
+        self.cached.unlink()
+        self.assertFalse(self.source.exists())
+        state(active={"nginx": True, "amazon-cloudwatch-agent": False}, activation_failures=1, **faults)
+
+    def substitute_removal(self):
+        directory = Path("/fixture/bin")
+        directory.mkdir()
+        shutil.copyfile("/suite/recovery_stub.py", directory / "rm")
+        (directory / "rm").chmod(0o755)
+
+    def test_monitoring_no_predecessor_cleanup_restores_absence_exit_40(self):
+        self.no_monitoring_predecessor()
+        self.assert_code(self.script("configure-monitoring.sh"), 40)
+        self.assertFalse(self.source.exists() or self.source.is_symlink())
+        self.assertFalse(self.cached.exists() or self.cached.is_symlink())
+        self.assertFalse(state()["active"]["amazon-cloudwatch-agent"])
+        self.assert_backups_private()
+
+    def test_monitoring_cleanup_removal_failure_exits_41(self):
+        self.no_monitoring_predecessor(removal_failure=True)
+        self.substitute_removal()
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertTrue(self.source.is_file() and self.cached.is_file())
+        self.assertFalse(state()["active"]["amazon-cloudwatch-agent"])
+        self.assert_backups_private()
+
+    def test_monitoring_cleanup_incomplete_removal_exits_41(self):
+        self.no_monitoring_predecessor(incomplete_removal=True)
+        self.substitute_removal()
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertTrue(self.source.is_file() and self.cached.is_file())
+        self.assert_backups_private()
+
+    def test_monitoring_cleanup_wrong_service_state_exits_41(self):
+        self.no_monitoring_predecessor()
+        state(active={"nginx": True, "amazon-cloudwatch-agent": True}, ignore_agent_stop=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertFalse(self.source.exists() or self.cached.exists())
+
+    def test_monitoring_rollback_cache_mismatch_exits_41(self):
+        self.monitoring_predecessor()
+        state(activation_failures=1, rollback_cache_mismatch=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assert_backups_private()
+
+    def test_monitoring_rollback_missing_cache_exits_41(self):
+        self.monitoring_predecessor()
+        state(activation_failures=1, rollback_cache_missing=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertFalse(self.cached.exists())
+        self.assert_backups_private()
+
+    def test_monitoring_rollback_source_mismatch_exits_41(self):
+        self.monitoring_predecessor()
+        state(activation_failures=1, rollback_source_mismatch=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assert_backups_private()
+
+    def test_monitoring_rollback_unconfigured_agent_exits_41(self):
+        self.monitoring_predecessor()
+        state(activation_failures=1, rollback_unconfigured=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertTrue(state()["active"]["amazon-cloudwatch-agent"])
+
+    def test_monitoring_rollback_inactive_agent_exits_41(self):
+        self.monitoring_predecessor()
+        state(activation_failures=1, rollback_inactive=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertFalse(state()["active"]["amazon-cloudwatch-agent"])
+
+    def test_monitoring_rollback_restores_prior_inactive_state_exit_40(self):
+        before = self.monitoring_predecessor()
+        state(active={"nginx": True, "amazon-cloudwatch-agent": False}, activation_failures=1)
+        self.assert_code(self.script("configure-monitoring.sh"), 40)
+        self.assertEqual(json.loads(self.cached.read_text()), before)
+        self.assertFalse(state()["active"]["amazon-cloudwatch-agent"])
+        self.assert_regular(self.cached, 0o600)
+
+    def test_monitoring_rollback_ignored_stop_exits_41(self):
+        self.monitoring_predecessor()
+        state(active={"nginx": True, "amazon-cloudwatch-agent": False}, activation_failures=1, ignore_agent_stop=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 41)
+        self.assertTrue(state()["active"]["amazon-cloudwatch-agent"])
+
+    def test_monitoring_rollback_consumed_source_exit_40(self):
+        before = self.monitoring_predecessor()
+        state(activation_failures=1, consume_source=True)
+        self.assert_code(self.script("configure-monitoring.sh"), 40)
+        self.assertFalse(self.source.exists())
+        self.assertEqual(json.loads(self.cached.read_text()), before)
+        self.assertTrue(state()["active"]["amazon-cloudwatch-agent"])
+        self.assert_regular(self.cached, 0o600)
+
+    def test_monitoring_rollback_does_not_reclaim_log_retention(self):
+        before = self.monitoring_predecessor()
+        with_retention = copy.deepcopy(before)
+        for entry in with_retention["logs"]["logs_collected"]["files"]["collect_list"]:
+            entry["retention_in_days"] = 7
+        self.cached.write_text(json.dumps(with_retention))
+        state(activation_failures=1)
+        self.assert_code(self.script("configure-monitoring.sh"), 40)
+        self.assertEqual(json.loads(self.cached.read_text()), before)
+        backup = next(Path("/var/backups/aws-portfolio-lab/monitoring").iterdir())
+        self.assertEqual(json.loads((backup / "original.json").read_text()), with_retention)
         self.assert_backups_private()
 
     def test_monitoring_healthy_cached_config_does_not_restart(self):

@@ -9,7 +9,7 @@ confirmation does not retroactively turn them into passing recovery tests.
 
 | Evidence | Result | Verification boundary |
 | --- | --- | --- |
-| Latest hosted Ubuntu CI | 121 Python tests passed, zero skips/failures/errors | 88 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
+| Latest hosted Ubuntu CI | 140 Python tests passed, zero skips/failures/errors | 107 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
 | Mocked Terraform test | One run passed with seven assertions | Offline denial, sensitivity, boundary/role and public-IP creation checks; no AWS apply |
 | Historical hosted recovery baseline | 114 tests passed, zero skips/failures/errors | 81 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
 | Private operator-wrapper checks | 225 passed: 170 server, 31 controller, 24 observer | Offline replay/adapters and negative cases; separate from repository CI and live recovery |
@@ -20,8 +20,8 @@ confirmation does not retroactively turn them into passing recovery tests.
 | CloudWatch-to-SNS notification | Successful action and operator-confirmed matching email | One simulated ALARM transition; no genuine CPU threshold breach |
 
 The latest verified hosted result is recorded at
-[CI run 45773288954](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45773288954)
-for commit `e40f5c8741ee3dc13a14c259a214b620df5679b9`: 121 Python tests plus
+[CI run 46124737536](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46124737536)
+for commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`: 140 Python tests plus
 one mocked Terraform test, with zero skips. The historical recovery baseline is at
 [CI run 45578485098](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45578485098)
 for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. Run visibility
@@ -175,7 +175,7 @@ contract, injected command, or fault parameter is sent to a live document.
 ## Coverage and expected outcomes
 
 Individual test names and outcomes appear in unittest output; every Linux case
-is mandatory. The 31 Linux cases cover:
+is mandatory. The hosted baseline's 31 Linux cases cover:
 
 | Area | Cases | Expected evidence |
 | --- | ---: | --- |
@@ -210,6 +210,21 @@ coordinator copies and private diagnostics use 0600. Assertions check content,
 numeric ownership, modes, link counts, recovery records, and latch state. Recovery
 is not expected to preserve the original inode or ctime after atomic replacement.
 
+## Proposed rollback regression coverage
+
+The local correction adds 13 isolated Agent recovery cases: no-predecessor cleanup,
+failed and incomplete removal, incorrect service state, mismatched/missing cache,
+conflicting surviving source, unconfigured or inactive recovered Agent, restoration
+of prior inactivity, ignored stop, consumed input, and Terraform-owned retention.
+Nine portable tests execute the actual rollback JSON-verifier heredoc against
+synthetic files, including malformed JSON, non-regular files and symlink rejection.
+
+The proposed total is **162 Python tests**: 116 ordinary tests, 44 isolated recovery
+cases and two readiness guards, plus the unchanged mocked Terraform test. These
+additional cases are not part of the verified 140-test hosted result. Complete
+Linux execution and hosted CI remain required before publication or deployment.
+The isolation runner, security assertions and production executor remain unchanged.
+
 ## Bounds and cleanup
 
 Each Bash fixture has a 20-second bound and group termination on timeout.
@@ -230,9 +245,10 @@ establish Linux recovery success on Windows. The historical corrected recovery
 run executed 81 ordinary tests, 31 recovery cases and two Linux readiness guards:
 114 total, zero skips. The 225 private offline checks are a separate result and
 must not be added to that hosted total or described as reproducible repository CI.
-The latest verified suite adds seven Python lifecycle-contract tests, for 121
-Python tests, plus one fully mocked Terraform test; it does not add another live
-recovery outcome or change the Agent-verification limitations.
+The historical 121-test result added seven Python lifecycle-contract tests. The
+latest verified hosted suite then added 19 artifact-verification tests, for 140
+Python tests plus one fully mocked Terraform test. Neither result adds another
+live recovery outcome or changes the Agent-verification limitations.
 
 The Linux harness demonstrates simulated recovery with command substitutes.
 The live outcomes and Agent limitations are documented above. Cancellation,

@@ -57,6 +57,18 @@ atomic_install() {
   if ! install -o root -g root -m 0644 -- "$source" "$temporary"; then rm -f -- "$temporary"; return 1; fi
   if ! mv -fT -- "$temporary" "$target"; then rm -f -- "$temporary"; return 1; fi
 }
+verify_restored_configuration() {
+  python3 - "$1" "$cached" "$target" <<'PY'
+import json, pathlib, sys
+expected=json.loads(pathlib.Path(sys.argv[1]).read_text())
+cached,source=map(pathlib.Path,sys.argv[2:])
+if cached.is_symlink() or not cached.is_file() or json.loads(cached.read_text())!=expected:
+    raise SystemExit('Restored Agent cache differs from the saved configuration.')
+# fetch-config may consume its input; a surviving source must still match.
+if source.is_symlink() or (source.exists() and (not source.is_file() or json.loads(source.read_text())!=expected)):
+    raise SystemExit('Restored Agent source differs from the saved configuration.')
+PY
+}
 on_error() {
   local code=$?
   trap - ERR
@@ -67,11 +79,21 @@ on_error() {
       if ! atomic_install "$backup/amazon-cloudwatch-agent.json" || ! "$ctl" -a fetch-config -m ec2 -c "file:$target" -s > "$backup/rollback.log" 2>&1; then
         echo "Rollback failed; inspect private backup $backup" >&2; exit 41
       fi
+      if ! verify_restored_configuration "$backup/amazon-cloudwatch-agent.json" >> "$backup/rollback.log" 2>&1; then
+        echo "Rollback configuration verification failed; inspect private backup $backup" >&2; exit 41
+      fi
     else
       systemctl stop amazon-cloudwatch-agent || exit 41
-      rm -f -- "$target" "$cached"
+      rm -f -- "$target" "$cached" || exit 41
+      [[ ! -e $target && ! -L $target && ! -e $cached && ! -L $cached ]] || exit 41
     fi
-    if (( ! was_active )); then systemctl stop amazon-cloudwatch-agent || exit 41; fi
+    if ((was_active)); then
+      systemctl is-active --quiet amazon-cloudwatch-agent || exit 41
+      "$ctl" -a status | python3 -c 'import json,sys;v=json.load(sys.stdin);sys.exit(0 if v.get("status")=="running" and v.get("configstatus")=="configured" else 1)' || exit 41
+    else
+      systemctl stop amazon-cloudwatch-agent || exit 41
+      [[ $(systemctl is-active amazon-cloudwatch-agent) == inactive ]] || exit 41
+    fi
     printf 'Prior telemetry configuration restored. Backup: %s\n' "$backup" >&2
     exit 40
   fi

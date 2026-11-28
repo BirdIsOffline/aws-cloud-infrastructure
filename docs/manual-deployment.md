@@ -2,7 +2,7 @@
 
 ## CI-only operating mode
 
-Both delivery workflows are disabled at repository level, and AWS denies new
+Both delivery workflows are individually disabled in GitHub, and AWS denies new
 federation and service permissions for the dedicated deployment role's sessions.
 CI remains enabled. Do not dispatch or re-run delivery. The procedures below
 document the retained implementation and its historical verification; they are
@@ -19,10 +19,13 @@ The corrected controlled live deployment passed exact-commit authorization,
 OIDC/STS, one restricted SSM execution, four zero script exits, strict idempotency,
 HTTP, fresh telemetry, retention and runtime masking checks. The earlier run's
 telemetry-verification failure remains recorded. Hosted CI subsequently passed
-the historical 114-test recovery baseline. Latest hosted CI passed 121 Python
+the historical 114-test recovery baseline. Latest hosted CI passed 140 Python
 tests plus one mocked Terraform test with zero skips. See the
 [testing record](recovery-testing.md) for live website restoration, confirmed
 simulated alarm-to-email delivery and the closed Agent-verification limitations.
+
+The [proposed monitoring rollback correction](authenticated-delivery.md#proposed-monitoring-rollback-release)
+is local only; the historical live results above apply to the earlier release.
 
 ## Authorization and execution
 
@@ -259,7 +262,7 @@ compression and size limits. No test assumes a role or executes an SSM command.
 
 The corrected live run verified OIDC/STS, restricted SSM, all four scripts, server
 idempotency, HTTP, aligned telemetry checks and secret-based masking. The current
-hosted suite passed 121 Python tests plus one mocked Terraform test with zero
+hosted suite passed 140 Python tests plus one mocked Terraform test with zero
 skips; the historical recovery baseline passed 114 tests. The 225 private
 operator-wrapper checks are separate offline evidence. Live cancellation, timeout and failed
 automatic-recovery scenarios were not deliberately exercised; they remain
@@ -303,8 +306,10 @@ References for the correction: [CloudWatch query periods and rounding](https://d
 [GitHub secrets and masking](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets),
 [pinned action's role ID logging](https://github.com/aws-actions/configure-aws-credentials/blob/e1253824e5c10ff9df46874f81ed3ec929e19cfd/src/index.ts#L261).
 
-Action pins were checked against official public release refs: checkout v6.1.0
-and configure-aws-credentials v6.3.0. Review future action revisions separately.
+Current action pins were checked against official public release refs: Checkout
+v7.0.1 and AWS Credentials v6.3.1 (disabled CD only). Setup Terraform was removed.
+The [CI guide](ci-cd.md#repository-hygiene-and-action-pins) records the exact pins
+and completed security rollout. Review future action revisions separately.
 
 References: [reusable workflow OIDC claims](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-with-reusable-workflows),
 [GitHub OIDC reference](https://docs.github.com/en/actions/reference/security/oidc),

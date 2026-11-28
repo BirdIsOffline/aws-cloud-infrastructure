@@ -233,9 +233,9 @@ inspect command status and the private operation record first. Root operators an
 other tools must respect the server lock. Staging/backup retention needs a separate
 review; this executor does not recursively delete diagnostic or recovery data.
 
-## Proposed monitoring rollback release
+## Monitoring rollback release
 
-The working-tree contract proposes a corrected `configure-monitoring.sh` reviewed
+The repository contract pins a corrected `configure-monitoring.sh` reviewed
 against commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`. The previously deployed
 and live-tested release retains the earlier script hash
 `6af72c71a8494916f30c8c4377eebf6e041be527b5d4c29ae8380a588177ca2c`; its
@@ -257,14 +257,16 @@ live Agent-verification limitations.
 
 The changed embedded contract derives a different document hash and name even
 though executor code is unchanged. No deployed document, IAM permission or state
-is changed by this local revision. Publication, hosted Linux tests, a separately
-reviewed parallel-document/policy cutover and any live test require further approval.
+is changed by publishing this revision. Hosted Ubuntu passed all 162 Python tests
+and the mocked Terraform test. Any parallel-document/policy cutover and live test
+require separate approval.
 The unchanged Terraform definitions consume this contract, so a future refreshed
 plan would need to reconcile the new document revision and its referenced ARN.
 The existing `prevent_destroy` guard blocks replacing the current document at the
 same resource address; do not treat this revision as a zero-change infrastructure plan.
-The production packer must reject these uncommitted bytes until they belong to
-the selected immutable commit. Offline candidate decoding is not Git provenance.
+The production packer verified this release against its committed Git blobs
+without candidate adapters. It continues to require both approved hashes and the
+selected immutable commit; offline decoding alone is not Git provenance.
 
 ## Executor revision and rollout procedure
 
@@ -302,7 +304,7 @@ do not create unreviewed versions under an authorized document name.
    disabled, in addition to the server lock.
 
 Local tests prove decoder/input behavior, not live IAM enforcement or service
-activation. Latest hosted CI passed 140 Python tests and one mocked Terraform
+activation. Verified correction CI passed 162 Python tests and one mocked Terraform
 test, with zero skips, including POSIX checks and isolated recovery. The earlier
 114-test recovery baseline remains a separate historical result. Live delivery
 and website restoration also passed; complete live Agent recovery verification

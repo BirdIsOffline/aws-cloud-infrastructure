@@ -9,7 +9,7 @@ confirmation does not retroactively turn them into passing recovery tests.
 
 | Evidence | Result | Verification boundary |
 | --- | --- | --- |
-| Latest hosted Ubuntu CI | 140 Python tests passed, zero skips/failures/errors | 107 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
+| Latest hosted Ubuntu CI | 162 Python tests passed, zero skips/failures/errors | 116 ordinary tests, 44 isolated recovery cases, two Linux readiness guards |
 | Mocked Terraform test | One run passed with seven assertions | Offline denial, sensitivity, boundary/role and public-IP creation checks; no AWS apply |
 | Historical hosted recovery baseline | 114 tests passed, zero skips/failures/errors | 81 ordinary tests, 31 isolated recovery cases, two Linux readiness guards |
 | Private operator-wrapper checks | 225 passed: 170 server, 31 controller, 24 observer | Offline replay/adapters and negative cases; separate from repository CI and live recovery |
@@ -19,10 +19,13 @@ confirmation does not retroactively turn them into passing recovery tests.
 | Live Agent restoration | Monitoring recovered; complete verification did not pass | Baseline/metadata-classification gaps and final preflight abort are recorded below |
 | CloudWatch-to-SNS notification | Successful action and operator-confirmed matching email | One simulated ALARM transition; no genuine CPU threshold breach |
 
-The latest verified hosted result is recorded at
+The verified correction result is recorded at
+[CI run 46129410785](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46129410785)
+for source commit `90c34c6db41052706762eedfafd045ef0ce9dab9`: 162 Python tests plus
+one mocked Terraform test, with zero skips. The preceding dependency-hardening
 [CI run 46124737536](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46124737536)
-for commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`: 140 Python tests plus
-one mocked Terraform test, with zero skips. The historical recovery baseline is at
+passed 140 Python tests and the mocked Terraform test at commit
+`7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`. The historical recovery baseline is at
 [CI run 45578485098](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45578485098)
 for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. Run visibility
 follows repository access settings. Private operator evidence and its
@@ -175,13 +178,13 @@ contract, injected command, or fault parameter is sent to a live document.
 ## Coverage and expected outcomes
 
 Individual test names and outcomes appear in unittest output; every Linux case
-is mandatory. The hosted baseline's 31 Linux cases cover:
+is mandatory. The current 44 Linux recovery cases cover:
 
 | Area | Cases | Expected evidence |
 | --- | ---: | --- |
 | Bootstrap prerequisites | 2 | Missing packages exit 5 in check mode; compliant bootstrap exits 0; DNF never runs |
 | Website deployment/recovery | 5 | Invalid HTML/Nginx exit 20 before writes; post-replacement failure restores baseline and exits 40; failed rollback exits 41; explicit rollback restores bytes and 0644 ownership/mode |
-| Agent validation/recovery | 7 | Invalid JSON, translation and schema failures exit 20; activation failure restores configuration and exits 40; failed recovery exits 41 with private backups; healthy cache avoids activation; consumed input is supported |
+| Agent validation/recovery | 20 | Candidate validation fails before activation; rollback requires semantic configuration and correct service state; failed/incomplete cleanup or restoration exits 41; consumed input and Terraform-owned retention are preserved; healthy cache avoids activation |
 | Coordinator and latch | 12 | Modified bundles and unapproved baselines reject; prerequisite/candidate failure precedes latch/backups; success records four zero exits and clears latch; ordinary failure restores website/Agent/source presence; failure retains latch; replay and alternate operations are blocked; fixture-only operator recovery is explicit; timeout skips unsafe recovery |
 | POSIX/process/isolation | 5 | Real lock contention rejects a second executor; subprocess timeout terminates its group; TERM-resistant child requires KILL; interrupted coordinator leaves durable latch after lock release; host escape and network access are unavailable |
 
@@ -210,20 +213,22 @@ coordinator copies and private diagnostics use 0600. Assertions check content,
 numeric ownership, modes, link counts, recovery records, and latch state. Recovery
 is not expected to preserve the original inode or ctime after atomic replacement.
 
-## Proposed rollback regression coverage
+## Monitoring rollback regression coverage
 
-The local correction adds 13 isolated Agent recovery cases: no-predecessor cleanup,
+The corrected repository release adds 13 isolated Agent recovery cases: no-predecessor cleanup,
 failed and incomplete removal, incorrect service state, mismatched/missing cache,
 conflicting surviving source, unconfigured or inactive recovered Agent, restoration
 of prior inactivity, ignored stop, consumed input, and Terraform-owned retention.
 Nine portable tests execute the actual rollback JSON-verifier heredoc against
 synthetic files, including malformed JSON, non-regular files and symlink rejection.
 
-The proposed total is **162 Python tests**: 116 ordinary tests, 44 isolated recovery
-cases and two readiness guards, plus the unchanged mocked Terraform test. These
-additional cases are not part of the verified 140-test hosted result. Complete
-Linux execution and hosted CI remain required before publication or deployment.
-The isolation runner, security assertions and production executor remain unchanged.
+All **162 Python tests** passed: 116 ordinary tests, 44 isolated recovery cases
+and two readiness guards, plus the unchanged mocked Terraform test. The 22 added
+cases were verified on hosted Ubuntu with zero failures or skips. The production
+packer verified committed release bytes without candidate adapters. The isolation
+runner, security assertions and production executor remain unchanged. This
+corrected repository release has not replaced the previously deployed AWS release
+or repeated live idempotency or recovery verification.
 
 ## Bounds and cleanup
 
@@ -246,9 +251,10 @@ run executed 81 ordinary tests, 31 recovery cases and two Linux readiness guards
 114 total, zero skips. The 225 private offline checks are a separate result and
 must not be added to that hosted total or described as reproducible repository CI.
 The historical 121-test result added seven Python lifecycle-contract tests. The
-latest verified hosted suite then added 19 artifact-verification tests, for 140
-Python tests plus one fully mocked Terraform test. Neither result adds another
-live recovery outcome or changes the Agent-verification limitations.
+140-test dependency-hardening result added 19 artifact-verification tests. The
+corrected monitoring release adds 22 regression cases, for 162 Python tests plus
+one fully mocked Terraform test. These results add no live recovery outcome and
+do not change the Agent-verification limitations.
 
 The Linux harness demonstrates simulated recovery with command substitutes.
 The live outcomes and Agent limitations are documented above. Cancellation,

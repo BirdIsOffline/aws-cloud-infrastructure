@@ -8,9 +8,9 @@ previously verified implementation. No deployment is authorized by this guide.
 ## Isolated recovery validation
 
 The source job also runs the offline Linux recovery harness through the existing
-validation entry point. Its hosted baseline of 31 recovery cases and two readiness guards uses unchanged
-production code inside an ephemeral chroot with isolated network/PID/mount namespaces and no credentials or
-host mounts. Missing Linux isolation support fails CI. Thirteen additional portable
+validation entry point. Its 44 recovery cases and two readiness guards execute
+production code unchanged inside an ephemeral chroot with isolated network/PID/mount
+namespaces and no credentials or host mounts. Missing Linux isolation support fails CI. Thirteen additional portable
 guard tests run with the existing regression suite. See
 [the recovery test guide](recovery-testing.md) for prerequisites, safety boundaries,
 expected exit codes, and the distinction between simulated and live recovery.
@@ -19,13 +19,13 @@ The published recovery baseline passed all 114 tests with zero skips: 81 ordinar
 recorded results and limits; the separate 225 private offline checks are not
 part of this CI count.
 
-Latest verified hosted CI passed **140 Python tests and one mocked Terraform
-test**, with zero failures or skips: 107 ordinary Python tests, 31 recovery cases,
-two Linux readiness guards, and a separate mocked Terraform run with seven assertions.
-[CI run 46124737536](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46124737536)
-records that result for commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`. The
-proposed rollback correction adds 22 tests, for a pending 162-test suite; see the
-[recovery coverage](recovery-testing.md#proposed-rollback-regression-coverage).
+Verified correction CI passed **162 Python tests and one mocked Terraform test**,
+with zero failures or skips: 116 ordinary Python tests, 44 recovery cases, two Linux
+readiness guards, and a separate mocked Terraform run with seven assertions.
+[CI run 46129410785](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46129410785)
+records that result for corrected source commit `90c34c6db41052706762eedfafd045ef0ce9dab9`.
+The additional 13 recovery cases and nine portable verifier tests are described in
+the [recovery coverage](recovery-testing.md#monitoring-rollback-regression-coverage).
 
 ## Current scope
 
@@ -254,7 +254,8 @@ allowlist. These repository observations do not verify live AWS controls.
   interceptors, blob request bodies and custom TLS verification callbacks are
   also not configured. Fixed GitHub HTTPS destinations, read-only tokens,
   disabled credential persistence and no AWS authentication constrain impact.
-  The current allowlist and Node 24 hosted compatibility must still be reviewed.
+  The completed rollout verified the exact allowlist and Node 24 hosted compatibility;
+  future action changes require the same review.
 - **Setup Terraform:** 4.0.1 remains the latest stable upstream action but its
   affected Axios/redirect/form/Undici bundles are removed from CI.
   Replacing the action also closes its installation path's missing explicit
@@ -352,10 +353,13 @@ key/manifest/signature fixtures enable offline Linux GPG acceptance and tamperin
 checks, including actual-signer expiration at a synthetic future verification time
 inside the negative test only. They contain no private keys. Actual download,
 signature and archive checksum verification, Linux execution, locked initialization
-and Terraform validation passed in the main run above. All **140 Python tests
-plus one mocked Terraform test** passed with zero skips. The earlier 121-test
-result remains historical evidence; the local rollback revision still needs its
-own complete hosted validation.
+and Terraform validation passed in the earlier
+[dependency-hardening main run](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46124737536).
+All **140 Python tests
+plus one mocked Terraform test** passed with zero skips in that historical
+hardening run. The corrected monitoring release subsequently passed the complete
+162-test suite and mocked Terraform test linked above. Earlier 121- and 140-test
+results remain historical evidence.
 
 ### Safe rollout and alerting
 

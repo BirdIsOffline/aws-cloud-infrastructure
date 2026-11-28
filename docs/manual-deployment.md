@@ -19,13 +19,14 @@ The corrected controlled live deployment passed exact-commit authorization,
 OIDC/STS, one restricted SSM execution, four zero script exits, strict idempotency,
 HTTP, fresh telemetry, retention and runtime masking checks. The earlier run's
 telemetry-verification failure remains recorded. Hosted CI subsequently passed
-the historical 114-test recovery baseline. Latest hosted CI passed 140 Python
+the historical 114-test recovery baseline. Verified correction CI passed 162 Python
 tests plus one mocked Terraform test with zero skips. See the
 [testing record](recovery-testing.md) for live website restoration, confirmed
 simulated alarm-to-email delivery and the closed Agent-verification limitations.
 
-The [proposed monitoring rollback correction](authenticated-delivery.md#proposed-monitoring-rollback-release)
-is local only; the historical live results above apply to the earlier release.
+The [corrected monitoring rollback release](authenticated-delivery.md#monitoring-rollback-release)
+passed hosted regression tests but remains undeployed. Historical live results
+above apply to the earlier AWS release.
 
 ## Authorization and execution
 
@@ -262,7 +263,7 @@ compression and size limits. No test assumes a role or executes an SSM command.
 
 The corrected live run verified OIDC/STS, restricted SSM, all four scripts, server
 idempotency, HTTP, aligned telemetry checks and secret-based masking. The current
-hosted suite passed 140 Python tests plus one mocked Terraform test with zero
+hosted suite passed 162 Python tests plus one mocked Terraform test with zero
 skips; the historical recovery baseline passed 114 tests. The 225 private
 operator-wrapper checks are separate offline evidence. Live cancellation, timeout and failed
 automatic-recovery scenarios were not deliberately exercised; they remain

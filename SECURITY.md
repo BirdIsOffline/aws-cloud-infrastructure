@@ -60,6 +60,7 @@ Live Agent recovery verification remains incomplete; isolated tests do not close
 that gap. See the [security boundary](docs/authenticated-delivery.md) and
 [recovery record](docs/recovery-testing.md).
 
-The proposed monitoring rollback correction and revised release contract are local
-only. They have not replaced the live SSM document or repeated live idempotency or
-recovery tests. CI-only operation and both published deployment denies are unchanged.
+The corrected monitoring rollback release passed hosted Linux regression tests.
+Its revised release contract has not replaced the live SSM document or repeated
+live idempotency or recovery tests. CI-only operation and both published
+deployment denies are unchanged.

@@ -137,3 +137,18 @@ Agent commands follow the installed toolchain and may make metadata/network read
 References: [CloudWatch Agent configuration](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html),
 [Agent control tool](https://github.com/aws/amazon-cloudwatch-agent/blob/main/packaging/dependencies/amazon-cloudwatch-agent-ctl),
 [Nginx configuration and reload](https://nginx.org/en/docs/beginners_guide.html).
+
+## Cost and operating boundaries
+
+Compute runtime, retained EBS storage, public IPv4 usage, CloudWatch logs/metrics,
+dashboard/alarm usage and notifications are cost drivers. No Free Tier or zero-cost
+coverage is assumed. Stopping compute leaves retained storage charges. Seven-day
+log retention limits log growth; private on-instance backups need a separate
+retention review. No NAT gateway, load balancer or artifact-storage service is added.
+
+The lab has no TLS endpoint, application failover, off-instance recovery backup,
+remote Terraform backend or demonstrated recovery from total instance loss.
+Root-volume delete-on-termination remains enabled. Adopted instance managed
+policies, outbound access and SNS permissions were preserved; further hardening
+requires separate design and review. The recovery record does not establish
+RTO/RPO guarantees or lossless telemetry.

@@ -20,8 +20,8 @@ confirmation does not retroactively turn them into passing recovery tests.
 | CloudWatch-to-SNS notification | Successful action and operator-confirmed matching email | One simulated ALARM transition; no genuine CPU threshold breach |
 
 The latest verified hosted result is recorded at
-[CI run 45759551505](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45759551505)
-for commit `f6a5976faaabb401aa06f056b9c06d74b2d3b156`: 121 Python tests plus
+[CI run 45773288954](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45773288954)
+for commit `e40f5c8741ee3dc13a14c259a214b620df5679b9`: 121 Python tests plus
 one mocked Terraform test, with zero skips. The historical recovery baseline is at
 [CI run 45578485098](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45578485098)
 for source commit `0c02cb9f26449f93d147f49c1b324004a7249e04`. Run visibility

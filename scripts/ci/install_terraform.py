@@ -21,6 +21,18 @@ SIGNING_FINGERPRINT = "C874011F0AB405110D02105534365D9472D7468F"
 KEY_URL = "https://www.hashicorp.com/.well-known/pgp-key.txt"
 RELEASE_URL = f"https://releases.hashicorp.com/terraform/{VERSION}/"
 MANIFEST = f"terraform_{VERSION}_SHA256SUMS"
+REJECTED_STATUSES = frozenset({
+    "BADSIG", "ERRSIG", "NO_PUBKEY", "NODATA", "FAILURE", "EXPSIG",
+    "EXPKEYSIG", "REVKEYSIG", "SIGEXPIRED", "KEYREVOKED",
+})
+
+
+def status_names(status):
+    """Return known status labels only; never return key IDs, UIDs or raw output."""
+    known = REJECTED_STATUSES | {"GOODSIG", "VALIDSIG", "KEYEXPIRED"}
+    return sorted({fields[1] for line in status.splitlines()
+                   if line.startswith("[GNUPG:] ") and len(fields := line.split()) > 1
+                   and fields[1] in known})
 
 
 class VerificationError(ValueError):
@@ -58,7 +70,9 @@ def gpg(home, arguments):
          "--no-auto-key-retrieve", "--no-auto-key-import", "--no-autostart", *arguments],
         capture_output=True, text=True, encoding="utf-8", timeout=30,
     )
-    require(result.returncode == 0, "GPG verification command failed")
+    summary = ", ".join(status_names(result.stdout)) or "NO_RECOGNIZED_STATUS"
+    require(result.returncode == 0,
+            f"GPG verification command failed (exit {result.returncode}; status {summary})")
     return result.stdout
 
 
@@ -84,10 +98,9 @@ def verify_key_listing(listing):
 def verify_signature_status(status):
     records = [line.split()[1:] for line in status.splitlines()
                if line.startswith("[GNUPG:] ")]
-    forbidden = {"BADSIG", "ERRSIG", "NO_PUBKEY", "NODATA", "FAILURE", "EXPSIG",
-                 "EXPKEYSIG", "REVKEYSIG", "KEYEXPIRED", "SIGEXPIRED", "KEYREVOKED"}
-    require(not any(record and record[0] in forbidden for record in records),
-            "Manifest signature is invalid, expired or revoked")
+    # KEYEXPIRED may describe an unused subkey; EXPKEYSIG identifies an expired signer.
+    rejected = sorted(set(status_names(status)) & REJECTED_STATUSES)
+    require(not rejected, "Manifest signature rejected: " + ", ".join(rejected))
     signatures = [record for record in records if record and record[0] == "VALIDSIG"]
     require(len(signatures) == 1, "Expected exactly one valid manifest signature")
     signature = signatures[0]

@@ -320,6 +320,12 @@ key retrieval/import. The installer checks the single primary fingerprint before
 import, requires one valid detached manifest signature from that primary or its
 GPG-authorized subkey, rejects expiration/revocation and weak signature digests,
 then requires exactly one matching manifest entry with the pinned archive hash.
+GnuPG's informational `KEYEXPIRED` can describe an unused subkey and does not
+invalidate an otherwise verified signature. The signer-specific `EXPKEYSIG`,
+`REVKEYSIG` and expired/invalid-signature statuses still stop verification, as does
+any nonzero GPG exit. Rejection diagnostics include only fixed status names and
+exit codes, excluding key IDs, identities and raw output. See the
+[GnuPG status specification](https://github.com/gpg/gnupg/blob/master/doc/DETAILS).
 Only after signature and hash checks does it extract the expected regular binary
 into a private runner directory and append that directory to `GITHUB_PATH`.
 Missing GPG, network errors, unexpected archive entries and verification failures
@@ -332,13 +338,14 @@ verification stays authoritative through the committed lock. Version, key or has
 changes require a reviewed update against official release evidence, never an
 emergency verification bypass.
 
-Sixteen artifact-verification tests cover wrong keys/signers, invalid/expired/revoked signatures,
+Nineteen artifact-verification tests cover wrong keys/signers, invalid/expired/revoked signatures,
 missing/duplicate/malformed checksum entries, corrupted archives, unsafe entries,
 download failures and verification-before-extraction/path-export ordering. Public
 key/manifest/signature fixtures enable offline Linux GPG acceptance and tampering
-checks. They contain no private keys. Actual download, signature verification and
+checks, including actual-signer expiration at a synthetic future verification time
+inside the negative test only. They contain no private keys. Actual download, signature verification and
 Linux execution must also pass in the Terraform job during the next approved PR.
-The proposed complete hosted total is **137 Python tests plus one mocked Terraform
+The proposed complete hosted total is **140 Python tests plus one mocked Terraform
 test**, all required to pass with zero skips. The latest published 121-test result
 above remains historical evidence until that run completes.
 
@@ -348,7 +355,7 @@ above remains historical evidence until that run completes.
    `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` beside the two
    existing baseline pins. Keep full-SHA enforcement and broad allowances disabled.
    The AWS credential action remains excluded; CD remains disabled.
-2. Publish through the protected PR procedure. Require both jobs, all 137 Python
+2. Publish through the protected PR procedure. Require both jobs, all 140 Python
    tests and the mocked Terraform test on Ubuntu with zero skips. This includes
    real GPG positive/tampering checks and the actual verified installer before
    Terraform execution. Review Node 24 compatibility, runtime and logs.

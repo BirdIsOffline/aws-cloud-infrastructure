@@ -79,15 +79,46 @@ class InstallerTests(unittest.TestCase):
 
     def test_signature_failure_expiration_and_revocation_fail_closed(self):
         for failure in ["BADSIG", "ERRSIG", "NO_PUBKEY", "NODATA", "FAILURE", "EXPSIG",
-                        "EXPKEYSIG", "REVKEYSIG", "KEYEXPIRED", "SIGEXPIRED", "KEYREVOKED"]:
+                        "EXPKEYSIG", "REVKEYSIG", "SIGEXPIRED", "KEYREVOKED"]:
             with self.subTest(failure=failure), self.assertRaises(installer.VerificationError):
                 installer.verify_signature_status(signature_status() + "[GNUPG:] " + failure + " key\n")
+
+    def test_unused_expired_subkeys_allow_only_an_otherwise_valid_signature(self):
+        for expiry in ("[GNUPG:] KEYEXPIRED 1640995200\n",
+                       "[GNUPG:] KEYEXPIRED 20220101T000000\n"):
+            with self.subTest(expiry=expiry):
+                installer.verify_signature_status(expiry + signature_status() + expiry)
+                with self.assertRaises(installer.VerificationError):
+                    installer.verify_signature_status(expiry)
+                with self.assertRaises(installer.VerificationError):
+                    installer.verify_signature_status(expiry + signature_status("A" * 40))
+                with self.assertRaises(installer.VerificationError):
+                    installer.verify_signature_status(expiry + signature_status().replace(" 1 8 00 ", " 1 2 00 "))
+
+    def test_actual_signer_and_signature_failures_override_unused_subkey_expiry(self):
+        for code in ("EXPKEYSIG", "REVKEYSIG", "KEYREVOKED", "EXPSIG", "SIGEXPIRED", "BADSIG"):
+            status = "[GNUPG:] KEYEXPIRED 1640995200\n" + signature_status() + f"[GNUPG:] {code} unneeded-detail\n"
+            with self.subTest(code=code), self.assertRaisesRegex(installer.VerificationError, f"^Manifest signature rejected: {code}$"):
+                installer.verify_signature_status(status)
+
+    def test_rejection_diagnostics_contain_only_known_status_labels(self):
+        raw = "unneeded-raw-output"
+        status = f"[GNUPG:] BADSIG {raw}\n[GNUPG:] UNKNOWN_{raw} hidden\n[GNUPG:] REVKEYSIG {raw}\n"
+        with self.assertRaises(installer.VerificationError) as failure:
+            installer.verify_signature_status(signature_status() + status)
+        self.assertEqual(str(failure.exception), "Manifest signature rejected: BADSIG, REVKEYSIG")
+        with mock.patch.object(installer.shutil, "which", return_value="synthetic-gpg"), \
+                mock.patch.object(installer.subprocess, "run", return_value=mock.Mock(returncode=2, stdout=status, stderr=raw)):
+            with self.assertRaises(installer.VerificationError) as command_failure:
+                installer.gpg(self.directory, [])
+        self.assertEqual(str(command_failure.exception), "GPG verification command failed (exit 2; status BADSIG, REVKEYSIG)")
+        self.assertNotIn(raw, str(command_failure.exception))
 
     def test_gpg_failure_missing_tool_and_timeout_do_not_fall_back(self):
         with mock.patch.object(installer.shutil, "which", return_value=None), self.assertRaises(installer.VerificationError):
             installer.gpg(self.directory, [])
         with mock.patch.object(installer.shutil, "which", return_value="synthetic-gpg"):
-            with mock.patch.object(installer.subprocess, "run", return_value=mock.Mock(returncode=2)), self.assertRaises(installer.VerificationError):
+            with mock.patch.object(installer.subprocess, "run", return_value=mock.Mock(returncode=2, stdout="")), self.assertRaises(installer.VerificationError):
                 installer.gpg(self.directory, [])
             with mock.patch.object(installer.subprocess, "run", side_effect=subprocess.TimeoutExpired("synthetic-gpg", 30)), self.assertRaises(subprocess.TimeoutExpired):
                 installer.gpg(self.directory, [])
@@ -240,6 +271,17 @@ class InstallerTests(unittest.TestCase):
                 if case == "valid":
                     installer.verify_signature(directory)
                     self.assertEqual(stat.S_IMODE((directory / "gnupg").stat().st_mode), 0o700)
+                    # Negative fixture only: move verification past the pinned key's 2030 expiry.
+                    expired = subprocess.run(
+                        [shutil.which("gpg"), "--no-options", "--homedir", str(directory / "gnupg"),
+                         "--batch", "--no-tty", "--no-auto-key-retrieve", "--no-auto-key-import",
+                         "--no-autostart", "--faked-system-time", "20310101T000000", "--status-fd", "1",
+                         "--verify", str(directory / (installer.MANIFEST + ".sig")), str(directory / installer.MANIFEST)],
+                        capture_output=True, text=True, encoding="utf-8", timeout=30,
+                    )
+                    self.assertIn("EXPKEYSIG", installer.status_names(expired.stdout))
+                    with self.assertRaisesRegex(installer.VerificationError, "EXPKEYSIG"):
+                        installer.verify_signature_status(expired.stdout)
                 else:
                     with self.assertRaises(installer.VerificationError):
                         installer.verify_signature(directory)

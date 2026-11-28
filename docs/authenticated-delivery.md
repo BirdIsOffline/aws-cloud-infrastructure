@@ -14,6 +14,12 @@ a separately reviewed configuration change, not a workflow re-run or variable.
 All capability descriptions below refer to the retained permission ceiling and
 previously verified design; the current deny overrides its service-access grants.
 
+The November 28, 2026 repository security review verified GitHub's disabled CD
+workflow states and inspected the published denial policies. It did not query AWS.
+Live IAM enforcement, outstanding sessions and EC2 status were not independently
+reverified; earlier live findings below remain historical evidence. See the
+[security policy](../SECURITY.md) and [current repository controls](ci-cd.md#repository-protections-and-solo-maintenance).
+
 ## Status and trust model
 
 Six Terraform security resources were separately provisioned from the approved

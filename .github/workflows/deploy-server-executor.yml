@@ -45,7 +45,7 @@ jobs:
       AWS_PAGER: ""
     steps:
       - name: Check out immutable dispatch revision
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -62,7 +62,7 @@ jobs:
           CD_SSM_DOCUMENT_SHA256: ${{ secrets.CD_SSM_DOCUMENT_SHA256 }}
         run: python3 -B scripts/cd/delivery.py prepare
       - name: Assume restricted deployment role with OIDC
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5 # v6.3.1
         with:
           aws-region: us-east-2
           audience: sts.amazonaws.com

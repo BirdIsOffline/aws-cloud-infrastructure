@@ -22,8 +22,8 @@ part of this CI count.
 Latest verified hosted CI passed **121 Python tests and one mocked Terraform
 test**, with zero skips: 88 ordinary Python tests, 31 recovery cases, two Linux
 readiness guards, and a separate mocked Terraform run with seven assertions.
-[CI run 45773288954](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45773288954)
-records that result for commit `e40f5c8741ee3dc13a14c259a214b620df5679b9`.
+[CI run 46119166117](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46119166117)
+records that result for commit `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`.
 
 ## Current scope
 
@@ -73,9 +73,10 @@ The reusable entry point runs:
   tests, including protections for all seven pinned files. They do not perform
   privileged deployment on the host; the recovery runner separately executes
   production code inside isolation. Native Windows skips real POSIX metadata
-  tests; those executed successfully on the hosted Linux runner.
+  tests; those executed successfully on the hosted Linux runner. The new real-GPG
+  fixture test also requires Linux and must pass during the next hosted validation.
 
-Ubuntu runner images provide Bash, Python 3, Git, and ShellCheck. Their installed
+Ubuntu runner images provide Bash, Python 3, Git, GPG, and ShellCheck. Their installed
 versions can change with image updates; no package installation or upgrade is part
 of this workflow. Bootstrap's `source=/dev/null` ShellCheck annotation describes
 the platform-owned `/etc/os-release` input: it is not repository source. It does
@@ -142,13 +143,14 @@ scans and operator review without assuming paid private-repository protections.
 Never commit runtime SSM output, email subscription details or recovery archives.
 
 External actions are pinned to full commit SHAs verified against official
-repository tag refs when this workflow was implemented:
+repository tag refs. The following table records the published baseline, not the
+replacement pins used by this hardening change:
 
 | Action | Release | Commit |
 | --- | --- | --- |
-| `actions/checkout` | v6.1.0 | `d23441a48e516b6c34aea4fa41551a30e30af803` |
-| `hashicorp/setup-terraform` | v4.0.1 | `dfe3c3f87815947d99a8997f908cb6525fc44e9e` |
-| `aws-actions/configure-aws-credentials` (CD only) | v6.3.0 | `e1253824e5c10ff9df46874f81ed3ec929e19cfd` |
+| [actions/checkout](https://github.com/actions/checkout/releases/tag/v6.1.0) | v6.1.0 | `d23441a48e516b6c34aea4fa41551a30e30af803` |
+| [hashicorp/setup-terraform](https://github.com/hashicorp/setup-terraform/releases/tag/v4.0.1) | v4.0.1 | `dfe3c3f87815947d99a8997f908cb6525fc44e9e` |
+| [aws-actions/configure-aws-credentials](https://github.com/aws-actions/configure-aws-credentials/releases/tag/v6.3.0) (CD only) | v6.3.0 | `e1253824e5c10ff9df46874f81ed3ec929e19cfd` |
 
 Update pins through reviewed changes after verifying the new commit belongs to the
 official repository and reviewing release notes. Local workflow validation uses
@@ -163,25 +165,215 @@ visibility does not adapt that gate or authorize delivery.
 
 Repository policy requires full-length action SHAs. The two approved CI actions
 are `actions/checkout` and `hashicorp/setup-terraform` at the exact pins above.
-Where GitHub supports an action allowlist, allow only those two pins, with broad
+The verified allowlist permits only those two pins, with broad
 GitHub-owned and verified-creator allowances disabled. The retained CD credential
 action is not part of the CI allowlist. Keep default workflow tokens read-only,
 workflow PR creation/approval disabled, and fork secrets/write tokens unavailable.
 Require maintainer approval for all external-contributor workflows where supported.
 
-The intended `main` protection requires pull requests, both named CI jobs from
-the GitHub Actions app, up-to-date branches, resolved conversations, and no force
-pushes or branch deletion. Apply protections to administrators without routine
-bypass. This is a solo project: require **zero approving reviewers**, no code-owner
-approval, and no independent approval of the latest push. Pull requests and CI
-remain required; they do not constitute independent two-person review.
+The following controls were verified through read-only GitHub settings queries on
+November 28, 2026 for commit `a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`:
 
-GitHub feature availability depends on visibility and plan. Free private
-repositories cannot enforce every protection above; do not describe unavailable
-settings as active. Verify branch protection, the exact action allowlist, external
-workflow approvals, secret scanning and push protection during an independently
-approved public cutover before re-enabling public CI. This guide does not authorize
-a visibility change, subscription purchase, or restoration of deployment access.
+| Control | Verified state |
+| --- | --- |
+| Main branch | Pull requests, both named CI checks from GitHub Actions, strict up-to-date branches and resolved conversations required |
+| Administrator enforcement | Enabled; no PR bypass users, teams or apps configured |
+| Force pushes and branch deletion | Blocked |
+| Reviewers | Zero required approving reviewers; solo maintenance is not independent two-person review |
+| Actions | Exact two CI pins above; broad GitHub-owned/verified-creator allowances disabled; full-length SHA enforcement enabled |
+| Workflow tokens | Read-only defaults; workflow PR creation/approval disabled |
+| External contributors | Workflow approval required for all external contributors |
+| Secret scanning and push protection | Enabled; no open secret-scanning alerts returned |
+| Dependency graph | Disabled in the public dependency UI; SBOM endpoint unavailable |
+| Dependabot alerts | Disabled, as explicitly reported by GitHub's alert API |
+| Private vulnerability reporting | Disabled |
+| CD workflows | Both disabled; CI active |
+
+These are repository observations, not independently verified live AWS state.
+Published Terraform retains deny-only federation and an explicit deny-all in the
+attached deployment policy. Neither source inspection nor earlier state snapshots
+prove those controls are still applied in AWS. This review used no AWS credentials.
+
+Source and Git-history privacy checks found no unintended sensitive values across
+102 committed blob objects. Twelve retained log archives from 14 run records,
+74 log members and 26 check outputs/annotation sets were reviewed. The previously
+cleaned exposing archive remains unavailable and its run record is intact. The
+other unavailable archive belongs to a startup-failure run. No artifacts or caches
+were present. Numeric matches in generated annotation URLs were proven to be
+GitHub check-run IDs, not AWS account values. No additional log cleanup was needed
+or performed. Pattern scans are not a guarantee against every possible secret.
+
+## Dependency review and open findings
+
+The November 28, 2026 follow-up reviewed all **55 distinct npm advisories** from
+previous lock audits, plus three Go advisory records. Severity and affected ranges
+were checked against official advisory records; propagated npm dependency entries
+were not counted as separate vulnerabilities. Official action source, shipped
+`dist` bundles, call sites and local Go binary build metadata were inspected.
+This is a static applicability review, not a proof that every runtime path is safe.
+
+| Component | Audited baseline | Hardening change | Remaining findings |
+| --- | --- | --- | --- |
+| Checkout | 6.1.0 | 7.0.1, `3d3c42e5aac5ba805825da76410c181273ba90b1` | Undici 6.27.0 still has 11 advisory matches, including high-severity network-response DoS |
+| Setup Terraform | 4.0.1 | Removed; verified official archive installer | Its Axios, redirect, multipart and Undici bundles no longer execute in the proposed CI |
+| AWS Credentials, disabled CD only | 6.3.0 | 6.3.1, `45666896f5d8e0f10ae255413f3a4cdd03bdc8f5` | Zero current npm audit matches; this is not a vulnerability-free guarantee |
+| Terraform CLI | 1.17.2 | Unchanged; latest stable | Two medium OpenTelemetry advisories; OpenPGP warning not applicable to the reviewed implementation |
+| AWS provider | 6.74.0 | Unchanged; latest stable | No matches in the checked declared-module dataset; not a complete binary/standard-library audit |
+
+The audit recorded the **baseline** Checkout/Setup Terraform allowlist above.
+The rollout below narrows it to the replacement Checkout pin after successful CI;
+repository settings must be verified separately from source changes. Both CD
+workflows remain disabled, and the credential action is excluded from the CI
+allowlist. These repository observations do not verify live AWS controls.
+
+### Action applicability and upstream fixes
+
+- **Checkout:** 7.0.1 is a partial net improvement for this workflow, not an
+  advisory-free release. The reviewed REST client moves from Undici 5.29.0 to
+  6.27.0. It fixes [response-queue poisoning](https://github.com/nodejs/undici/security/advisories/GHSA-35p6-xmwp-9g52),
+  which can misassociate responses on reused connections, and
+  [unbounded response decompression](https://github.com/nodejs/undici/security/advisories/GHSA-g9mf-h72j-4rw9).
+  Those paths can run during REST fallback/default-branch lookup and commit
+  telemetry. Normal repository transfer uses Git. The benefit is removing an
+  integrity failure and unbounded resource exhaustion from an occasionally used
+  HTTP path, rather than merely reducing manifest counts. Removing Busboy/UUID
+  findings is not counted as decisive: their vulnerable multipart and v3/v5/v6
+  buffer APIs were not used here.
+
+  The tradeoff is explicit: 6.27.0 still matches 11 advisories, including
+  TLS 1.2 renegotiation DoS and a newer excessive-content-encoding crash. Both
+  require malicious or compromised contacted endpoints. This does not provide
+  an availability guarantee; the new crash is not treated as fixed. Other new
+  matches involve unused WebSocket/EventSource APIs. Cookie helpers, retry
+  interceptors, blob request bodies and custom TLS verification callbacks are
+  also not configured. Fixed GitHub HTTPS destinations, read-only tokens,
+  disabled credential persistence and no AWS authentication constrain impact.
+  The current allowlist and Node 24 hosted compatibility must still be reviewed.
+- **Setup Terraform:** 4.0.1 remains the latest stable upstream action but its
+  affected Axios/redirect/form/Undici bundles are removed from the proposed CI.
+  Replacing the action also closes its installation path's missing explicit
+  archive-verification step. No fork, transitive override or new package dependency
+  is used; the replacement uses Ubuntu's Python standard library and GPG.
+- **AWS Credentials:** 6.3.1 is an official patch release and raises basic-ftp to
+  6.2.6, ip-address to 10.7.5 and Undici to 6.29.1, outside all reviewed ranges.
+  The old FTP/listing and IP-classification findings were in the optional
+  proxy/PAC/SOCKS chain, without a matching configured input. OIDC token retrieval
+  uses the bundled HTTP client, but no credential action executes in active CI.
+  The local patch does not enable CD or add this action to the CI allowlist.
+
+See the official [Checkout release](https://github.com/actions/checkout/releases/tag/v7.0.1),
+[AWS Credentials release](https://github.com/aws-actions/configure-aws-credentials/releases/tag/v6.3.1),
+[Setup Terraform releases](https://github.com/hashicorp/setup-terraform/releases),
+[Undici TLS advisory](https://github.com/nodejs/undici/security/advisories/GHSA-2m5v-pch6-74hx),
+[Undici response DoS advisory](https://github.com/nodejs/undici/security/advisories/GHSA-xjj6-f33q-929c),
+and [Axios advisories](https://github.com/axios/axios/security/advisories).
+
+### Terraform applicability and artifact integrity
+
+Terraform's binary includes OpenTelemetry 1.45.0/SDK log 0.21.0. Both
+[GO-2026-6974](https://pkg.go.dev/vuln/GO-2026-6974) (attribute-limit bypass) and
+[GO-2026-6975](https://pkg.go.dev/vuln/GO-2026-6975) (bounded baggage allocation
+amplification) are medium severity, CVSS 5.3, and fixed upstream in 1.47.0.
+The CLI enables exporting and baggage propagation only when
+`OTEL_TRACES_EXPORTER=otlp`; CI sets neither that option nor inbound baggage.
+The workflow runs formatting, initialization, validation and a fully mocked test,
+not a public telemetry server. The affected code is included, but a hostile input
+path was not established for these jobs. No patched stable Terraform CLI was
+available, so its modules were not overridden or rebuilt locally.
+
+The [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) warning concerns the obsolete
+`golang.org/x/crypto/openpgp` package. Terraform's source and reviewed Windows
+binary use the maintained `github.com/ProtonMail/go-crypto/openpgp` implementation
+instead. The old package path was absent from the binary; merely declaring
+x/crypto 0.58.0 is not evidence of that OpenPGP exposure. The Go record supplies
+no CVSS severity. Provider 6.74.0 has newer OpenTelemetry 1.47.0/x/crypto 0.59.0.
+A complete Go standard-library and symbol-level vulnerability scan remains outside
+this review; Linux binary execution was unavailable locally.
+
+All proposed action SHAs resolve to official stable tags; Checkout and AWS
+Credentials commits have GitHub-verified signatures. Downloaded action files
+matched official Git tree blob hashes. Locally recorded archive SHA-256 values
+are evidence hashes, not signed upstream attestations or reproducible builds.
+Official Windows/Linux Terraform and provider archive hashes matched HashiCorp's
+manifests; provider hashes also matched the unchanged lock, and installed Windows
+binaries matched their archives. Local detached-signature execution was unavailable
+because the installed GPG runtime failed to start. Successful production GPG
+verification remains a mandatory hosted gate, not an assumed local result.
+
+### Verified Terraform installation
+
+`scripts/ci/install_terraform.py` supports only Linux x86_64 and Terraform 1.17.2.
+It downloads from the fixed official HTTPS endpoints without redirects or retries.
+Its trust anchors are:
+
+- Primary signing fingerprint: `C874011F0AB405110D02105534365D9472D7468F`,
+  independently checked against HashiCorp's
+  [key-update bulletin](https://discuss.hashicorp.com/t/hcsec-2026-03-hashicorp-gpg-key-72d7468f-update/77237)
+  and calculated from the downloaded public key. The bulletin extends expiry to
+  March 1, 2030; an expired/revoked signing key still fails verification.
+- Archive: `terraform_1.17.2_linux_amd64.zip`.
+- Exact SHA-256: `e6f16b2f0b137ee5729caa8c4e79a3bae4ee261acd198a1fcfa8584a6296605b`,
+  checked against the official release manifest and downloaded archive.
+
+A private temporary GPG home excludes user configuration/keyrings and automatic
+key retrieval/import. The installer checks the single primary fingerprint before
+import, requires one valid detached manifest signature from that primary or its
+GPG-authorized subkey, rejects expiration/revocation and weak signature digests,
+then requires exactly one matching manifest entry with the pinned archive hash.
+GnuPG's informational `KEYEXPIRED` can describe an unused subkey and does not
+invalidate an otherwise verified signature. The signer-specific `EXPKEYSIG`,
+`REVKEYSIG` and expired/invalid-signature statuses still stop verification, as does
+any nonzero GPG exit. Rejection diagnostics include only fixed status names and
+exit codes, excluding key IDs, identities and raw output. See the
+[GnuPG status specification](https://github.com/gpg/gnupg/blob/master/doc/DETAILS).
+Only after signature and hash checks does it extract the expected regular binary
+into a private runner directory and append that directory to `GITHUB_PATH`.
+Missing GPG, network errors, unexpected archive entries and verification failures
+stop the job. No unverified binary is executed, no system installation is changed,
+and no root privileges or additional packages are needed.
+
+The existing formatting, `-backend=false -lockfile=readonly` initialization,
+validation and fully mocked Terraform test steps remain unchanged. Provider
+verification stays authoritative through the committed lock. Version, key or hash
+changes require a reviewed update against official release evidence, never an
+emergency verification bypass.
+
+Nineteen artifact-verification tests cover wrong keys/signers, invalid/expired/revoked signatures,
+missing/duplicate/malformed checksum entries, corrupted archives, unsafe entries,
+download failures and verification-before-extraction/path-export ordering. Public
+key/manifest/signature fixtures enable offline Linux GPG acceptance and tampering
+checks, including actual-signer expiration at a synthetic future verification time
+inside the negative test only. They contain no private keys. Actual download, signature verification and
+Linux execution must also pass in the Terraform job during the next approved PR.
+The proposed complete hosted total is **140 Python tests plus one mocked Terraform
+test**, all required to pass with zero skips. The latest published 121-test result
+above remains historical evidence until that run completes.
+
+### Safe rollout and alerting
+
+1. With separate settings approval, temporarily add only
+   `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1` beside the two
+   existing baseline pins. Keep full-SHA enforcement and broad allowances disabled.
+   The AWS credential action remains excluded; CD remains disabled.
+2. Publish through the protected PR procedure. Require both jobs, all 140 Python
+   tests and the mocked Terraform test on Ubuntu with zero skips. This includes
+   real GPG positive/tampering checks and the actual verified installer before
+   Terraform execution. Review Node 24 compatibility, runtime and logs.
+3. After successful merge/main CI, remove both the old Checkout and Setup Terraform
+   entries. The final allowlist contains **only**
+   `actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`. Verify the effective settings after
+   rollout. If verification fails, stop and retain the existing main;
+   correct only through reviewed changes, never by restoring an unverified download
+   fallback or disabling SHA enforcement. Rollback does not require AWS changes.
+4. Separately approve free dependency graph, Dependabot alerts and private
+   vulnerability reporting. Keep automated dependency/security-update PRs and
+   auto-merge disabled. Dependabot does not alert on SHA-pinned action references,
+   and coverage does not extend to every prebundled dependency or Terraform Go
+   module; retain periodic bundle-aware review.
+
+Residual Checkout and Terraform findings remain open for upstream remediation.
+This proposal changes no live AWS controls; local validation is not hosted or
+live-AWS verification.
 
 ## Authenticated manual delivery
 

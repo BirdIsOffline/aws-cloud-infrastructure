@@ -233,6 +233,41 @@ inspect command status and the private operation record first. Root operators an
 other tools must respect the server lock. Staging/backup retention needs a separate
 review; this executor does not recursively delete diagnostic or recovery data.
 
+## Monitoring rollback release
+
+The repository contract pins a corrected `configure-monitoring.sh` reviewed
+against commit `7cd4faf5e8fc9af0531e6e372ce1329cc41350a2`. The previously deployed
+and live-tested release retains the earlier script hash
+`6af72c71a8494916f30c8c4377eebf6e041be527b5d4c29ae8380a588177ca2c`; its
+original contract records baseline commit `940acec15a95e7d09b6678186f702b3f4b2cb814`.
+Historical live results apply to that earlier release, not this correction.
+
+Only the monitoring script hash/byte length and `approved_from_commit` change.
+The other six file pins, staging modes, homepage predecessor allowance, size
+limits, template and executor bytes remain unchanged. The baseline commit field
+records review ancestry; the final immutable commit is authorized separately.
+
+The new script checks rollback deletion results, expected absence, semantic
+configuration equality and restoration of active/inactive service state before
+reporting completion. A consumed source JSON is permitted; the cached JSON remains
+required when restoring a prior configuration. Retention is still excluded from
+the rollback candidate so Terraform remains authoritative. These checks do not
+prove full generated TOML/YAML or metadata recovery and do not close the recorded
+live Agent-verification limitations.
+
+The changed embedded contract derives a different document hash and name even
+though executor code is unchanged. No deployed document, IAM permission or state
+is changed by publishing this revision. Hosted Ubuntu passed all 162 Python tests
+and the mocked Terraform test. Any parallel-document/policy cutover and live test
+require separate approval.
+The unchanged Terraform definitions consume this contract, so a future refreshed
+plan would need to reconcile the new document revision and its referenced ARN.
+The existing `prevent_destroy` guard blocks replacing the current document at the
+same resource address; do not treat this revision as a zero-change infrastructure plan.
+The production packer verified this release against its committed Git blobs
+without candidate adapters. It continues to require both approved hashes and the
+selected immutable commit; offline decoding alone is not Git provenance.
+
 ## Executor revision and rollout procedure
 
 The SSM document name includes a hash of its complete rendered content: code,
@@ -269,7 +304,7 @@ do not create unreviewed versions under an authorized document name.
    disabled, in addition to the server lock.
 
 Local tests prove decoder/input behavior, not live IAM enforcement or service
-activation. Latest hosted CI passed 121 Python tests and one mocked Terraform
+activation. Verified correction CI passed 162 Python tests and one mocked Terraform
 test, with zero skips, including POSIX checks and isolated recovery. The earlier
 114-test recovery baseline remains a separate historical result. Live delivery
 and website restoration also passed; complete live Agent recovery verification

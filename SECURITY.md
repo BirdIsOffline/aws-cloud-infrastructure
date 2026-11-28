@@ -14,13 +14,14 @@ is made.
 
 ## Verified repository controls
 
-The audited baseline on November 28, 2026 covered commit
-`a68db8ed88bdfc2a2cf8261f437afdc0eecebc66` and GitHub settings:
+The November 28, 2026 audit baseline covered commit
+`a68db8ed88bdfc2a2cf8261f437afdc0eecebc66`. The completed hardening rollout at
+`7cd4faf5e8fc9af0531e6e372ce1329cc41350a2` subsequently verified these GitHub controls:
 
 - Main requires pull requests, both CI jobs, up-to-date branches and resolved
   conversations. Protections apply to administrators; force pushes and deletion
   are blocked. Zero independent reviewers are required for solo maintenance.
-- Actions accept only the two exact CI pins in the [CI guide](docs/ci-cd.md#repository-hygiene-and-action-pins),
+- Actions accept only the exact Checkout 7.0.1 pin in the [CI guide](docs/ci-cd.md#repository-hygiene-and-action-pins),
   with full-length SHA enforcement. Default tokens are read-only, workflow PR
   creation/approval is disabled, and all external contributors require workflow approval.
 - Secret scanning and push protection are enabled. They supplement, rather than
@@ -29,22 +30,24 @@ The audited baseline on November 28, 2026 covered commit
   federation; its attached policy explicitly denies deployment-session permissions.
   CI requests no AWS authentication or OIDC token and does not deploy infrastructure.
 
-These GitHub controls were read live. AWS was not queried: published Terraform,
+These GitHub controls were read live during that rollout, not re-queried for the
+local rollback correction. AWS was not queried: published Terraform,
 local state or previous reports cannot establish current live IAM, sessions,
 instance health or drift. Re-enabling delivery requires separate review.
 
 ## Open security work
 
-The audit found dependency graph, Dependabot alerts and private reporting disabled.
-The hardening rollout enables these free features while keeping automatic updates
-disabled. Alert coverage does not replace bundle-aware reviews: SHA-pinned actions,
+The original audit found dependency graph, Dependabot alerts and private reporting
+disabled. The completed rollout enabled these free features, verified zero open
+dependency alerts, and kept automatic dependency/security updates disabled.
+Alert coverage does not replace bundle-aware reviews: SHA-pinned actions,
 bundled npm code and Terraform Go modules may not produce Dependabot alerts.
 
-This hardening replaces Setup Terraform with an installer that requires the
+The completed hardening replaced Setup Terraform with an installer that requires the
 pinned HashiCorp signing-key fingerprint, a valid signed manifest and the exact
 Terraform 1.17.2 Linux archive hash before extraction. No verification fallback is
 allowed. Checkout 7.0.1 and AWS Credentials 6.3.1 use reviewed immutable pins; the
-rollout narrows CI to a Checkout-only allowlist. Checkout retains response-handling DoS
+rollout verified a Checkout-only allowlist. Checkout retains response-handling DoS
 advisories, and Terraform includes two medium OpenTelemetry findings whose paths
 CI does not enable. The obsolete OpenPGP warning does not match Terraform's
 reviewed implementation. See the [dependency review](docs/ci-cd.md#dependency-review-and-open-findings)
@@ -56,3 +59,8 @@ access, local Terraform state and on-instance backups. The executor runs as root
 Live Agent recovery verification remains incomplete; isolated tests do not close
 that gap. See the [security boundary](docs/authenticated-delivery.md) and
 [recovery record](docs/recovery-testing.md).
+
+The corrected monitoring rollback release passed hosted Linux regression tests.
+Its revised release contract has not replaced the live SSM document or repeated
+live idempotency or recovery tests. CI-only operation and both published
+deployment denies are unchanged.

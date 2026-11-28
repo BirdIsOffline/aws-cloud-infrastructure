@@ -103,12 +103,16 @@ See the [security model](docs/authenticated-delivery.md) and
 
 ## Verified results
 
-[Hosted CI run 45773288954](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/45773288954)
-passed both jobs at commit `e40f5c8741ee3dc13a14c259a214b620df5679b9`:
-**121 Python tests plus one mocked Terraform test**, with zero skips.
+[Hosted correction CI run 46129410785](https://github.com/BirdIsOffline/aws-cloud-infrastructure/actions/runs/46129410785)
+passed both jobs for corrected source commit `90c34c6db41052706762eedfafd045ef0ce9dab9`:
+**162 Python tests plus one mocked Terraform test**, with zero failures or skips.
 CI checks source hygiene, Bash/ShellCheck, JSON/monitoring contracts, HTML,
 release integrity, isolated recovery and locked Terraform validation. Actions use
 full SHA pins and read-only permissions; CI has no AWS authentication or deployment privileges.
+
+The [corrected monitoring rollback release](docs/authenticated-delivery.md#monitoring-rollback-release)
+passed hosted regression tests. Its revised script and SSM contract have **not**
+been deployed to AWS; historical live results below apply to the earlier release.
 
 Historical live verification demonstrated:
 

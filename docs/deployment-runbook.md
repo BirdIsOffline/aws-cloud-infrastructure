@@ -133,6 +133,16 @@ configuration, recovery stops the Agent and removes only this script's new sourc
 and cached fragment. Previously inactive Agent service state is restored. Private
 activation/rollback logs remain in the backup directory, never in the repository.
 
+The corrected repository release verifies that both source/cache paths are absent
+after no-predecessor cleanup; failed removal or leftover paths return exit 41.
+For a predecessor configuration it requires semantic equality of the restored
+cache and any surviving source with the retention-free backup. Agent consumption
+of the source is allowed. A previously active Agent must be active and report
+running/configured; a previously inactive Agent must return to inactive. Only
+verified rollback returns exit 40. Hosted regression tests passed, but this
+correction has not been deployed or live-tested; see the
+[release revision](authenticated-delivery.md#monitoring-rollback-release).
+
 ## Exit codes
 
 | Code | Meaning |

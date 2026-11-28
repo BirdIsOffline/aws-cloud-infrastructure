@@ -124,7 +124,7 @@ Local Bash syntax, JSON/HTML checks, source inspections, LF checks, and help-onl
 execution do not prove Linux deployment behavior. Controlled server tests verified
 Nginx configuration integration, Agent translation/schema checks, local/public HTTP,
 service health, fresh metrics/log delivery, and strict repeat-run idempotency.
-The latest hosted Linux suite passed 121 Python tests, including 31 isolated
+The verified correction suite passed 162 Python tests, including 44 isolated
 recovery cases and two readiness guards, plus one mocked Terraform test. The
 historical recovery baseline passed 114 tests. Live website restoration passed;
 Agent restoration recovered healthy monitoring but did not complete its full verification and is
@@ -133,6 +133,10 @@ boundaries and the 225 separate private offline checks. An Agent activation may
 regenerate cached/generated files or update metadata even with unchanged content;
 that differs from a compliant no-op deployment, which must avoid activation.
 Agent commands follow the installed toolchain and may make metadata/network reads.
+
+The [corrected monitoring rollback release](authenticated-delivery.md#monitoring-rollback-release)
+has a revised repository contract but remains undeployed. It has not repeated these live deployment,
+idempotency or recovery checks and does not change the recorded limitations.
 
 References: [CloudWatch Agent configuration](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html),
 [Agent control tool](https://github.com/aws/amazon-cloudwatch-agent/blob/main/packaging/dependencies/amazon-cloudwatch-agent-ctl),

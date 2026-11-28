@@ -4,6 +4,7 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import time
 
@@ -48,7 +49,8 @@ elif name == "systemctl":
     elif verb == "is-enabled":
         output = "enabled"
     elif verb in {"start", "stop"}:
-        active[service] = verb == "start"
+        if not (verb == "stop" and service == "amazon-cloudwatch-agent" and flag("ignore_agent_stop")):
+            active[service] = verb == "start"
     elif verb not in {"reload", "enable"}:
         code = 99
 elif name == "nginx":
@@ -80,7 +82,8 @@ elif name == "amazon-cloudwatch-agent-ctl":
     action = option("-a")
     if action == "status":
         running = state.get("active", {}).get("amazon-cloudwatch-agent", True)
-        output = json.dumps({"status": "running" if running else "stopped", "configstatus": "configured"})
+        configured = not (flag("rollback_unconfigured") and state.get("activations", 0) >= 2)
+        output = json.dumps({"status": "running" if running else "stopped", "configstatus": "configured" if configured else "not configured"})
     elif action == "fetch-config":
         state["activations"] = state.get("activations", 0) + 1
         source = Path(option("-c").removeprefix("file:"))
@@ -91,8 +94,27 @@ elif name == "amazon-cloudwatch-agent-ctl":
         state.setdefault("active", {})["amazon-cloudwatch-agent"] = code == 0
         if flag("consume_source") and code == 0:
             source.unlink()
+        if state["activations"] >= 2:
+            if flag("rollback_cache_mismatch"):
+                value = json.loads(cached.read_text())
+                value["agent"]["debug"] = "unexpected fixture value"
+                cached.write_text(json.dumps(value))
+            if flag("rollback_cache_missing"):
+                cached.unlink()
+            if flag("rollback_source_mismatch") and source.exists():
+                value = json.loads(source.read_text())
+                value["agent"]["debug"] = "unexpected fixture value"
+                source.write_text(json.dumps(value))
+            if flag("rollback_inactive"):
+                state["active"]["amazon-cloudwatch-agent"] = False
     else:
         code = 99
+elif name == "rm":
+    cached = "/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/file_amazon-cloudwatch-agent.json"
+    if cached in args and flag("removal_failure"):
+        code = 1
+    elif cached not in args or not flag("incomplete_removal"):
+        code = subprocess.run(["/usr/bin/rm", *args], check=False).returncode
 else:
     code = 99
 STATE.write_text(json.dumps(state))

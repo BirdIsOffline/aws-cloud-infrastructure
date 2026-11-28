@@ -20,8 +20,8 @@
       "mode": "0700"
     },
     "scripts/configure-monitoring.sh": {
-      "sha256": "6af72c71a8494916f30c8c4377eebf6e041be527b5d4c29ae8380a588177ca2c",
-      "bytes": 8803,
+      "sha256": "b6596cd38f66b3ee4862c367a0f02b2cea87029f8f414e138055a291ecac194e",
+      "bytes": 10132,
       "mode": "0700"
     },
     "scripts/verify-server.sh": {
@@ -45,6 +45,6 @@
       "mode": "0600"
     }
   },
-  "approved_from_commit": "940acec15a95e7d09b6678186f702b3f4b2cb814",
+  "approved_from_commit": "7cd4faf5e8fc9af0531e6e372ce1329cc41350a2",
   "document_name_prefix": "portfolio-lab-deploy-server"
 }
